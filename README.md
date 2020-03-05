@@ -1,23 +1,47 @@
-![de_GWD](https://i.loli.net/2019/06/05/5cf78011df0b260138.png)
+[![telegram](https://i.loli.net/2019/10/23/Ol9PX7io5b3hZsz.png)](https://t.me/de_GWD)
 
 
-### Server：
-Quick install version
+![de_GWD](https://i.loli.net/2020/02/26/Sk7awvCJTLsUh8D.png)
+
+## Server：
+
 ```
-apt-get install -y curl
-curl -4 -O https://raw.githubusercontent.com/gwdburst/de_GWD/master/de_GWD_Server/server && chmod +x server && ./server
+apt install -y wget
+bash <(wget --no-check-certificate -qO- https://raw.githubusercontent.com/jacyl4/de_GWD/master/server)
+```
+![server](https://i.loli.net/2020/02/23/EZldb3zPtgKGprX.png)
+
+
+## Client：
+Compatible Edition (amd64&arm64)
+```
+apt install -y wget
+bash <(wget --no-check-certificate -qO- http://xznat.seso.icu:10290/client)
 ```
 
-Run-time compilation version
+
+General Edition (amd64)
 ```
-apt-get install -y curl
-curl -4 -O https://raw.githubusercontent.com/gwdburst/de_GWD/master/de_GWD_Server/server2 && chmod +x server2 && ./server2
+apt install -y wget
+bash <(wget --no-check-certificate -qO- http://xznat.seso.icu:10290/client_do)
+```
+![client](https://i.loli.net/2020/02/22/5L3go4kPVSmrTID.png)
+
+
+![client_do](https://i.loli.net/2020/02/23/6Qb3zBlR5WoPTAe.png)
+
+
+
+## Extension edition:
+
+Nat Server (amd64)
+```
+apt install -y wget
+bash <(wget --no-check-certificate -qO- https://raw.githubusercontent.com/jacyl4/de_GWD/master/server_nat)
 ```
 
-![server](https://i.loli.net/2019/06/07/5cfa3c9154f3157603.png)
-
-### Client：
+Nat forward Client (amd64)
 ```
-wget -4 -N --no-check-certificate https://raw.githubusercontent.com/gwdburst/de_GWD/master/de_GWD_Client/client && chmod +x ~/client && ~/client
+apt install -y wget
+bash <(wget --no-check-certificate -qO- http://xznat.seso.icu:10290/client_do_fwd)
 ```
-![client](https://i.loli.net/2019/06/06/5cf80b8da7ed137743.png)

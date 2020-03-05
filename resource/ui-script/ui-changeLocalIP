@@ -1,0 +1,12 @@
+#!/bin/bash
+localip=$(jq -r '.divertLan | to_entries[] | .value' /usr/local/bin/0conf)
+
+jq 'del(.routing.rules[4].source[])' /etc/vtrui/config.json > /tmp/vtrui_temp
+
+for localippre in $localip; do
+jq --arg localippre $localippre '.routing.rules[4].source+=[$localippre]' /tmp/vtrui_temp > /tmp/vtrui_temp2 && mv -f /tmp/vtrui_temp2 /tmp/vtrui_temp
+done
+
+mv -f /tmp/vtrui_temp /etc/vtrui/config.json
+
+chmod 666 /etc/vtrui/config.json
