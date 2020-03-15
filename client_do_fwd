@@ -12,10 +12,6 @@ mirrorSite="http://xznat.seso.icu:10290"
 
 
 clifwd_iptablesProxy(){
-sed -i '/net.ipv4.conf.default.accept_source_route =/c\net.ipv4.conf.default.accept_source_route = 0' /etc/sysctl.conf
-sed -i '/net.ipv4.ip_forward =/c\net.ipv4.ip_forward = 0' /etc/sysctl.conf
-sysctl -p
-
 sed -i '/--dport 53 -i/d' /usr/local/bin/iptables-proxy-up
 sed -i '/--dport 8053 -j/d' /usr/local/bin/iptables-proxy-up
 
@@ -152,6 +148,12 @@ location /dq {
   proxy_pass                http://127.0.0.1:8053/dq;
   proxy_set_header          Host \$host;
   proxy_set_header          X-Real-IP \$remote_addr;
+  proxy_connect_timeout     43200000;
+  proxy_send_timeout        43200000;
+  proxy_read_timeout        43200000;
+  proxy_redirect            off;
+  proxy_buffering           off;
+  proxy_buffer_size         4k;
 }
 
 location $clifwd_v2path {
@@ -168,8 +170,6 @@ location $clifwd_v2path {
   proxy_redirect            off;
   proxy_buffering           off;
   proxy_buffer_size         4k;
-  proxy_buffers             64 4k;
-  proxy_busy_buffers_size   8k;
 }
 }
 EOF
@@ -241,8 +241,11 @@ clifwd_installWebUI(){
 rm -rf /usr/local/bin/ui-*
 rm -rf /var/www/html/gwd/*.php
 cd ~
+
+if [[ ! -d "/var/www/html/gwd" ]]; then
 mkdir -p /var/www/html/gwd
 ln -s /var/www/html/admin  /var/www/html/gwd/admin
+fi
 
 svn export --force https://github.com/jacyl4/de_GWD/trunk/resource/ui-script
 svn export --force https://github.com/jacyl4/de_GWD/trunk/resource/ui-web

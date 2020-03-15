@@ -76,11 +76,17 @@ EOF
 echo "ulimit -n 1000000" > ~/.bash_profile
 
 cat << EOF > /etc/sysctl.conf
+kernel.sysrq = 0
+kernel.core_uses_pid = 1
+kernel.randomize_va_space = 2
+kernel.pid_max = 1000000
 vm.overcommit_memory = 1
 vm.swappiness = 10
 fs.file-max = 1000000
 fs.inotify.max_user_instances = 1000000
 fs.inotify.max_user_watches = 1000000
+fs.protected_hardlinks = 1
+fs.protected_symlinks = 1
 net.core.netdev_max_backlog = 32768
 net.core.optmem_max = 8388608
 net.core.rmem_max = 8388608
@@ -99,6 +105,7 @@ net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.default.arp_ignore = 1
 net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.accept_source_route = 0
 net.ipv4.conf.default.accept_source_route = 0
 net.ipv4.ip_forward = 0
 net.ipv4.ip_local_port_range = 1025 65535
@@ -107,11 +114,13 @@ net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_fin_timeout = 15
 net.ipv4.tcp_orphan_retries = 2
 net.ipv4.tcp_syn_retries = 2
 net.ipv4.tcp_synack_retries = 2
-net.ipv4.tcp_sack = 0
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_dsack = 1
+net.ipv4.tcp_fack = 1
 net.ipv4.tcp_max_syn_backlog = 32768
 net.ipv4.tcp_max_tw_buckets = 6000
 net.ipv4.tcp_max_orphans = 32768
@@ -121,6 +130,7 @@ net.ipv4.tcp_keepalive_time = 1800
 net.ipv4.tcp_keepalive_intvl = 15
 net.ipv4.tcp_keepalive_probes = 3
 net.ipv4.tcp_ecn = 0
+net.ipv4.tcp_rfc1337 = 1
 EOF
 
 if [[ "$(uname -r)" =~ "bbrplus" ]]; then
@@ -410,7 +420,7 @@ worker_processes auto;
 worker_rlimit_nofile 100000;
 
 events {
-    worker_connections  2048;
+    worker_connections  4096;
     multi_accept on;
     use epoll;
 }
@@ -436,7 +446,6 @@ http {
   client_header_timeout     60;
   client_body_timeout       60;
   reset_timedout_connection on;
-  send_timeout              60;
   types_hash_max_size       2048;
 
   gzip                      on;
@@ -628,6 +637,12 @@ location /dq {
   proxy_pass                http://127.0.0.1:8053/dq;
   proxy_set_header          Host \$host;
   proxy_set_header          X-Real-IP \$remote_addr;
+  proxy_connect_timeout     43200000;
+  proxy_send_timeout        43200000;
+  proxy_read_timeout        43200000;
+  proxy_redirect            off;
+  proxy_buffering           off;
+  proxy_buffer_size         4k;
 }
 
 location $v2path {
@@ -644,8 +659,6 @@ location $v2path {
   proxy_redirect            off;
   proxy_buffering           off;
   proxy_buffer_size         4k;
-  proxy_buffers             64 4k;
-  proxy_busy_buffers_size   8k;
 }
 }
 EOF
@@ -785,6 +798,12 @@ location /dq {
   proxy_pass                http://127.0.0.1:8053/dq;
   proxy_set_header          Host \$host;
   proxy_set_header          X-Real-IP \$remote_addr;
+  proxy_connect_timeout     43200000;
+  proxy_send_timeout        43200000;
+  proxy_read_timeout        43200000;
+  proxy_redirect            off;
+  proxy_buffering           off;
+  proxy_buffer_size         4k;
 }
 
 location $v2path {
@@ -801,8 +820,6 @@ location $v2path {
   proxy_redirect            off;
   proxy_buffering           off;
   proxy_buffer_size         4k;
-  proxy_buffers             64 4k;
-  proxy_busy_buffers_size   8k;
 }
 }
 EOF
