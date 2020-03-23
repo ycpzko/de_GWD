@@ -97,8 +97,6 @@ net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.default.arp_ignore = 1
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
 net.ipv4.ip_forward = 0
 net.ipv4.ip_local_port_range = 1025 65535
 net.ipv4.tcp_window_scaling = 1
@@ -381,14 +379,17 @@ After=network.target
 User=root
 Type=simple
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
-Restart=on-failure
-RestartPreventExitStatus=23
+KillMode=process
+Restart=always
+RestartSec=2
+StartLimitIntervalSec=2
+TimeoutSec=2
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload > /dev/null 2>&1
+systemctl daemon-reload
 systemctl enable vtrui
 systemctl restart vtrui
 }
