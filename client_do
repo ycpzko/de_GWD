@@ -184,7 +184,7 @@ speed-check-mode  tcp:80,ping
 cache-size        10000
 prefetch-domain   yes
 serve-expired     yes
-serve-expired-ttl 2
+serve-expired-ttl 30
 
 server-https https://$domain/dq
 server-https https://$domain/dq
@@ -203,7 +203,7 @@ rr-ttl-min        60
 rr-ttl-max        43200
 prefetch-domain   yes
 serve-expired     yes
-serve-expired-ttl 2
+serve-expired-ttl 30
 
 server 114.114.114.114
 server 114.114.115.115
@@ -435,11 +435,13 @@ After=network.target
 User=root
 Type=simple
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
+ExecStop=/bin/kill -9 \$MAINPID
 KillMode=process
 Restart=always
 RestartSec=2
-StartLimitIntervalSec=2
-TimeoutSec=2
+StartLimitBurst=0
+StartLimitIntervalSec=5
+TimeoutSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -763,14 +765,6 @@ rm -rf /var/www/html/index.lighttpd.orig
 systemctl mask --now dhcpcd > /dev/null 2>&1
 systemctl daemon-reload > /dev/null 2>&1
 
-rm -rf /etc/resolv.conf
-echo "" > /etc/resolvconf/run/interface/original.resolvconf
-echo "" > /etc/resolvconf/resolv.conf.d/original
-echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
-ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
-resolvconf -u
-
 cat << EOF > /etc/dnsmasq.conf
 conf-dir=/etc/dnsmasq.d
 listen-address=127.0.0.1
@@ -957,9 +951,11 @@ User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/ui-update
+ExecStop=/bin/kill -9 \$MAINPID
 KillMode=process
-StartLimitIntervalSec=2
-TimeoutSec=2
+StartLimitBurst=0
+StartLimitIntervalSec=5
+TimeoutSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -1020,6 +1016,14 @@ rm -rf /var/www/html/log.log
 EOF
 chmod +x /usr/local/bin/Q4H
 /usr/local/bin/Q4H
+
+rm -rf /etc/resolv.conf
+echo "" > /etc/resolvconf/run/interface/original.resolvconf
+echo "" > /etc/resolvconf/resolv.conf.d/original
+echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
+echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
+ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
+resolvconf -u
 
 pihole restartdns
 output=$(/usr/local/bin/ui-NodeDThide > /dev/null 2>&1)
@@ -1221,6 +1225,16 @@ sleep 3
 
 installPihole
 
+rm -rf /etc/resolv.conf
+echo "" > /etc/resolvconf/run/interface/original.resolvconf
+echo "" > /etc/resolvconf/resolv.conf.d/original
+echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
+echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
+ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
+resolvconf -u
+
+pihole restartdns
+
 if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
 /usr/local/bin/ui-dhcpUP
 fi
@@ -1277,14 +1291,6 @@ installDep
 installNginx
 
 installWebUI
-
-rm -rf /etc/resolv.conf
-echo "" > /etc/resolvconf/run/interface/original.resolvconf
-echo "" > /etc/resolvconf/resolv.conf.d/original
-echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
-ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
-resolvconf -u
 
 postInstall
 blue "--------------------"
