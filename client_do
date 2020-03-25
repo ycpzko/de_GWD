@@ -87,8 +87,9 @@ net.core.rmem_default = 8388608
 net.core.wmem_max = 8388608
 net.core.wmem_default = 8388608
 net.core.somaxconn = 32768
+net.netfilter.nf_conntrack_checksum = 0
+net.netfilter.nf_conntrack_max = 1000000
 net.nf_conntrack_max = 1000000
-net.netfilter.nf_conntrack_checksum=0
 net.ipv4.icmp_echo_ignore_broadcasts = 1
 net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv6.conf.all.disable_ipv6 = 1
@@ -96,6 +97,8 @@ net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.default.arp_ignore = 1
+net.ipv4.conf.all.rp_filter = 2
+net.ipv4.conf.default.rp_filter = 2
 net.ipv4.conf.all.send_redirects = 1
 net.ipv4.conf.default.send_redirects = 1
 net.ipv4.conf.all.accept_redirects = 1
@@ -175,12 +178,13 @@ dpkg -P smartdns > /dev/null 2>&1
 
 wget --no-check-certificate -O ~/smartdns.deb $smartdns_amd64
 dpkg -i ~/smartdns.deb
+rm -rf ~/smartdns.deb
 
 cat << EOF > /etc/smartdns/doh.conf
 bind 127.0.0.1:5370 -force-aaaa-soa
 bind-tcp 127.0.0.1:5370 -force-aaaa-soa
 
-speed-check-mode  tcp:80,ping
+speed-check-mode  ping,tcp:80
 cache-size        10000
 prefetch-domain   yes
 serve-expired     yes
@@ -196,7 +200,7 @@ conf-file /etc/smartdns/doh.conf
 bind 127.0.0.1:5310 -force-aaaa-soa
 bind-tcp 127.0.0.1:5310 -force-aaaa-soa
 
-speed-check-mode  tcp:80,ping
+speed-check-mode  ping,tcp:80
 cache-size        10000
 rr-ttl            600
 rr-ttl-min        60
@@ -232,7 +236,6 @@ RestartSec=2
 [Install]
 WantedBy=multi-user.target
 EOF
-rm -rf ~/smartdns.deb
 
 systemctl daemon-reload
 systemctl enable smartdns
@@ -242,7 +245,6 @@ systemctl restart smartdns
 
 
 installDOH(){
-cd ~
 portcheck=$(echo $port | grep '^[0-9]\+$')
 if [[ $portcheck = "" ]] || [[ $portcheck = "443" ]]; then
 doh=$domain
@@ -254,7 +256,7 @@ fi
 domainip=$(nslookup $domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
 
 wget --no-check-certificate -O ~/doh.zip $mirrorSite/dohamd64.zip
-unzip doh.zip
+unzip ~/doh.zip -d ~/
 mv -f ~/doh/doh-client /usr/local/bin/doh-client
 chmod +x /usr/local/bin/doh-client
 rm -rf ~/doh*
@@ -330,13 +332,14 @@ systemctl restart doh-client
 
 
 installV2ray(){
-cd ~
 mkdir -p /usr/bin/vtrui
 mkdir -p /etc/vtrui
+mkdir -p ~/vtrui
 
 wget --no-check-certificate -O ~/vtrui.zip $mirrorSite/vtamd64.zip
-unzip vtrui.zip
-mv -f ~/vtrui/vtrui /usr/bin/vtrui/vtrui
+unzip ~/vtrui.zip -d ~/vtrui
+rm -rf /usr/bin/vtrui/*
+mv -f ~/vtrui/v2ray /usr/bin/vtrui/vtrui
 mv -f ~/vtrui/v2ctl /usr/bin/vtrui/v2ctl
 mv -f ~/vtrui/geoip.dat /usr/bin/vtrui/geoip.dat
 chmod +x /usr/bin/vtrui/vtrui
@@ -407,7 +410,6 @@ cat << EOF > /etc/vtrui/config.json
   {"tag":"dnsout","protocol":"dns"}
 ],
 "routing": {
-  "domainStrategy": "AsIs",
   "rules": [
     {"type":"field","inboundTag":"DNSflow","outboundTag":"direct"},
     {"type":"field","inboundTag":"dnsin","outboundTag":"dnsout"},
@@ -617,7 +619,6 @@ EOF
 systemctl daemon-reload
 systemctl enable iptables-proxy
 output=$(systemctl restart iptables-proxy)
-sleep 3
 
 rm -rf /etc/resolv.conf
 cat << EOF > /etc/resolv.conf
