@@ -190,23 +190,8 @@ fi
 dpkg -i ~/smartdns.deb
 rm -rf ~/smartdns.deb
 
-cat << EOF > /etc/smartdns/doh.conf
-bind 127.0.0.1:5370 -force-aaaa-soa
-bind-tcp 127.0.0.1:5370 -force-aaaa-soa
-
-speed-check-mode  ping,tcp:80
-cache-size        10000
-prefetch-domain   yes
-serve-expired     yes
-serve-expired-ttl 30
-
-server-https https://$domain/dq
-server-https https://$domain/dq
-EOF
-
+rm -rf /etc/smartdns/*.conf
 cat << EOF > /etc/smartdns/smartdns.conf
-conf-file /etc/smartdns/doh.conf
-
 bind 127.0.0.1:5310 -force-aaaa-soa
 bind-tcp 127.0.0.1:5310 -force-aaaa-soa
 
@@ -255,6 +240,8 @@ systemctl restart smartdns
 
 
 installDOH(){
+rm -rf /usr/local/bin/doh-client
+
 portcheck=$(echo $port | grep '^[0-9]\+$')
 if [[ $portcheck = "" ]] || [[ $portcheck = "443" ]]; then
 doh=$domain
@@ -346,6 +333,8 @@ systemctl restart doh-client
 
 
 installV2ray(){
+rm -rf /usr/bin/vtrui/*
+
 mkdir -p /usr/bin/vtrui
 mkdir -p /etc/vtrui
 mkdir -p ~/vtrui
@@ -356,7 +345,6 @@ elif [[ $architecture = "amd64" ]]; then
     wget --no-check-certificate -O ~/vtrui.zip $mirrorSite/vtamd64.zip
 fi
 unzip ~/vtrui.zip -d ~/vtrui
-rm -rf /usr/bin/vtrui/*
 mv -f ~/vtrui/v2ray /usr/bin/vtrui/vtrui
 mv -f ~/vtrui/v2ctl /usr/bin/vtrui/v2ctl
 mv -f ~/vtrui/geoip.dat /usr/bin/vtrui/geoip.dat
@@ -370,8 +358,7 @@ cat << EOF > /etc/vtrui/config.json
   "tag": "DNSflow",
   "hosts": {"localhost":"127.0.0.1"},
   "servers": [
-    {"address":"127.0.0.1","port":5380},
-    {"address":"127.0.0.1","port":5370}
+    {"address":"127.0.0.1","port":5380}
   ]
 },
 "inbounds": [
@@ -457,6 +444,7 @@ Type=simple
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
 ExecStop=/bin/kill -9 \$MAINPID
 KillMode=process
+LimitNOFILE=1000000
 Restart=always
 RestartSec=2
 StartLimitBurst=0
@@ -548,8 +536,6 @@ iptables -A INPUT -p udp --dport 53 -s 127.0.0.1,172.17.0.0/24,172.16.66.0/24 -j
 
 iptables -A INPUT -p tcp --dport 5310 -i $ethernetnum -j DROP
 iptables -A INPUT -p udp --dport 5310 -i $ethernetnum -j DROP
-iptables -A INPUT -p tcp --dport 5370 -i $ethernetnum -j DROP
-iptables -A INPUT -p udp --dport 5370 -i $ethernetnum -j DROP
 iptables -A INPUT -p tcp --dport 5380 -i $ethernetnum -j DROP
 iptables -A INPUT -p udp --dport 5380 -i $ethernetnum -j DROP
 iptables -A INPUT -p tcp --dport 5390 -i $ethernetnum -j DROP
@@ -560,8 +546,6 @@ iptables -t mangle -A V2PROXY -p tcp --dport 53 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 53 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5310 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5310 -j ACCEPT
-iptables -t mangle -A V2PROXY -p tcp --dport 5370 -j ACCEPT
-iptables -t mangle -A V2PROXY -p udp --dport 5370 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5390 -j ACCEPT
@@ -644,7 +628,7 @@ cat << EOF > /etc/resolv.conf
 nameserver 127.0.0.1
 nameserver 1.1.1.1
 nameserver 8.8.8.8
-option use-vc
+options use-vc
 EOF
 
 echo
@@ -688,7 +672,6 @@ cat << EOF > /etc/pihole/setupVars.conf
 PIHOLE_INTERFACE=$ethernetnum
 IPV4_ADDRESS=$localaddr/24
 PIHOLE_DNS_1=127.0.0.1#5380
-PIHOLE_DNS_2=127.0.0.1#5370
 QUERY_LOGGING=true
 INSTALL_WEB_SERVER=true
 INSTALL_WEB_INTERFACE=true
@@ -713,11 +696,10 @@ port=5390
 EOF
 
 cat << EOF > /etc/pihole/dns-servers.conf
- DNS over Https;127.0.0.1#5380;127.0.0.1#5370
+ DNS over Https;127.0.0.1#5380
 EOF
 sed -i '/server=/d'  /etc/dnsmasq.d/01-pihole.conf
 sed -i '/interface=/i\server=127.0.0.1#5380' /etc/dnsmasq.d/01-pihole.conf
-sed -i '/interface=/i\server=127.0.0.1#5370' /etc/dnsmasq.d/01-pihole.conf
 
 cat << EOF > /etc/pihole/pihole-FTL.conf
 PRIVACYLEVEL=0
@@ -841,7 +823,7 @@ rm -rf /etc/resolv.conf
 echo "" > /etc/resolvconf/run/interface/original.resolvconf
 echo "" > /etc/resolvconf/resolv.conf.d/original
 echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
+echo "options use-vc"  > /etc/resolvconf/resolv.conf.d/tail
 ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
 resolvconf -u
 
@@ -1040,10 +1022,10 @@ cat << EOF > /etc/resolv.conf
 nameserver 127.0.0.1
 nameserver 1.1.1.1
 nameserver 8.8.8.8
-option use-vc
+options use-vc
 EOF
 
-jq '.dns.servers=[{"address":"127.0.0.1","port":5380},{"address":"127.0.0.1","port":5370}]' /etc/vtrui/config.json > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
+jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /etc/vtrui/config.json > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
 output=$(systemctl restart iptables-proxy)
 sleep 3
 
@@ -1053,7 +1035,7 @@ rm -rf /etc/resolv.conf
 echo "" > /etc/resolvconf/run/interface/original.resolvconf
 echo "" > /etc/resolvconf/resolv.conf.d/original
 echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
+echo "options use-vc"  > /etc/resolvconf/resolv.conf.d/tail
 ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
 resolvconf -u
 
