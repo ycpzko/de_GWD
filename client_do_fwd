@@ -80,11 +80,12 @@ After=network.target
 [Service]
 User=nobody
 Type=simple
+LimitNPROC=64000
+LimitNOFILE=1000000
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=/usr/local/bin/doh-server -conf /etc/dns-over-https/doh-server.conf
 Restart=always
 RestartSec=2
-LimitNOFILE=1000000
 
 [Install]
 WantedBy=multi-user.target
@@ -193,7 +194,7 @@ jacyl4/nginx_tls1.3:latest
 
 
 makeSSL_D(){
-apt update && apt install -y netcat socat
+apt update && apt install netcat socat
 
 export CF_Key="$CFapikey"
 export CF_Email="$CFemail"
@@ -383,7 +384,7 @@ rm -rf /etc/resolv.conf
 echo "" > /etc/resolvconf/run/interface/original.resolvconf
 echo "" > /etc/resolvconf/resolv.conf.d/original
 echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "options use-vc"  > /etc/resolvconf/resolv.conf.d/tail
+echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
 ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
 resolvconf -u
 
@@ -483,7 +484,7 @@ blue "----------------------------"
 
 
 installBBRplus(){
-apt install -y wget
+apt install wget
 mkdir -p ~/bbrkernel && cd ~/bbrkernel
 wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-headers-4.14.168-bbrplus_4.14.168-bbrplus-1-$(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1)_amd64.deb
 wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-image-4.14.168-bbrplus_4.14.168-bbrplus-1-$(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1)_amd64.deb
@@ -577,7 +578,7 @@ cd ~
 echo "deb http://deb.debian.org/debian/ unstable main" > /etc/apt/sources.list.d/unstable.list
 printf 'Package: *\nPin: release a=unstable\nPin-Priority: 90\n' > /etc/apt/preferences.d/limit-unstable
 
-apt update && apt install -y linux-headers-$(uname -r) libmnl-dev libelf-dev bc gcc make wireguard-tools
+apt update && apt install linux-headers-$(uname -r) libmnl-dev libelf-dev bc gcc make wireguard-tools
 
 git clone https://git.zx2c4.com/wireguard-linux-compat
 cd ~/wireguard-linux-compat/src
@@ -615,7 +616,7 @@ cat << EOF > /etc/resolv.conf
 nameserver 127.0.0.1
 nameserver 1.1.1.1
 nameserver 8.8.8.8
-options use-vc
+option use-vc
 EOF
 
 jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /etc/vtrui/config.json > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
@@ -624,20 +625,7 @@ sleep 3
 
 installPihole
 
-rm -rf /etc/resolv.conf
-echo "" > /etc/resolvconf/run/interface/original.resolvconf
-echo "" > /etc/resolvconf/resolv.conf.d/original
-echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "options use-vc"  > /etc/resolvconf/resolv.conf.d/tail
-ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
-resolvconf -u
-
-pihole restartdns
-
-if [[ ! -d "/var/www/html/gwd" ]]; then
-mkdir -p /var/www/html/gwd
-ln -s /var/www/html/admin /var/www/html/gwd/admin
-fi
+piholeSet
 
 if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
 /usr/local/bin/ui-dhcpUP
@@ -646,6 +634,11 @@ fi
 output=$(/usr/local/bin/ui-NodeDThide > /dev/null 2>&1)
 output=$(/usr/local/bin/ui-saveListBW > /dev/null 2>&1)
 systemctl restart iptables-proxy
+
+if [[ ! -d "/var/www/html/gwd" ]]; then
+mkdir -p /var/www/html/gwd
+ln -s /var/www/html/admin /var/www/html/gwd/admin
+fi
 blue "----------------------"
 blue "Install Pi-hole [done]"
 blue "----------------------"
@@ -700,6 +693,8 @@ installV2ray
 installIptablesProxy
 
 installDep
+
+piholeSet
 
 installNginx
 
