@@ -57,13 +57,6 @@ source /etc/profile
 systemctl enable --now haveged > /dev/null 2>&1
 systemctl mask --now lighttpd > /dev/null 2>&1
 
-echo "deb [arch=amd64] http://mirrors.aliyun.com/docker-ce/linux/debian $(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1) stable" > /etc/apt/sources.list.d/docker.list
-wget -qO- http://mirrors.aliyun.com/docker-ce/linux/debian/gpg | apt-key add -
-
-apt update && apt install docker-ce docker-ce-cli containerd.io
-systemctl enable docker
-systemctl restart docker
-
 dpkg --configure -a
 
 cat << EOF > /etc/security/limits.conf
@@ -416,15 +409,17 @@ jq --arg key $domain --arg value $domainip '.dns.hosts += {($key): ($value)}' > 
 cat << EOF > /lib/systemd/system/vtrui.service
 [Unit]
 Description=vtrui Service
-After=network.target
+After=network.target nss-lookup.target
+Wants=network-online.target
 
 [Service]
 User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
-ExecStop=/bin/kill -9 \$MAINPID
+ExecStop=/bin/kill -9 $MAINPID
 Restart=always
 RestartSec=2
 StartLimitBurst=0
@@ -634,6 +629,9 @@ deb http://deb.debian.org/debian-security/ $(cat /etc/os-release | grep VERSION=
 deb http://deb.debian.org/debian $(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1)-updates main
 EOF
 
+echo "deb [arch=amd64] https://download.docker.com/linux/debian $(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1) stable" > /etc/apt/sources.list.d/docker.list
+curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+
 echo "deb https://packages.sury.org/php/ $(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1) main" > /etc/apt/sources.list.d/php.list
 wget -qO /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 
@@ -642,7 +640,10 @@ apt update && apt upgrade && apt autoremove && apt autoclean
 sed -i "/www-data/d" /etc/sudoers
 sed -i "/Allow members of group sudo to execute any command/a\www-data ALL=(root)  NOPASSWD:ALL" /etc/sudoers
 
-apt install php7.3-fpm php7.3-common php7.3-cgi php7.3-opcache php7.3-json php7.3-sqlite3 sqlite3
+apt install docker-ce docker-ce-cli containerd.io php7.3-fpm php7.3-common php7.3-cgi php7.3-opcache php7.3-json php7.3-sqlite3 sqlite3
+
+systemctl enable docker
+systemctl restart docker
 
 cat << EOF > /etc/php/7.3/fpm/php-fpm.conf
 [global]
@@ -663,6 +664,7 @@ user = www-data
 group = www-data
 listen = /run/php/php7.3-fpm.sock
 listen.allowed_clients = 127.0.0.1
+listen.backlog = 65536
 listen.mode = 0666
 
 pm = ondemand
@@ -686,8 +688,8 @@ sed -i "/engine =/c\engine = off" /etc/php/7.3/fpm/php.ini
 sed -i "/disable_functions =/c\disable_functions =" /etc/php/7.3/fpm/php.ini
 
 sed -i "/zend_extension=opcache.so/d" /etc/php/7.3/fpm/php.ini
-sed -i "/\[opcache\]/a\zend_extension=opcache.so" /etc/php/7.3/fpm/php.ini
 sed -i "/opcache.enable=/c\opcache.enable=1" /etc/php/7.3/fpm/php.ini
+sed -i "/opcache.enable_cli=/c\opcache.enable_cli=1" /etc/php/7.3/fpm/php.ini
 sed -i "/opcache.memory_consumption=/c\opcache.memory_consumption=128" /etc/php/7.3/fpm/php.ini
 sed -i "/opcache.interned_strings_buffer=/c\opcache.interned_strings_buffer=8" /etc/php/7.3/fpm/php.ini
 sed -i "/opcache.max_accelerated_files=/c\opcache.max_accelerated_files=10000" /etc/php/7.3/fpm/php.ini

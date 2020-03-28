@@ -311,6 +311,7 @@ RestartSec=2
 [Install]
 WantedBy=multi-user.target
 EOF
+
 systemctl daemon-reload > /dev/null 2>&1
 systemctl enable doh-server
 systemctl restart doh-server
@@ -379,15 +380,17 @@ jq --arg v2path "$v2path" '.inbounds[0].streamSettings.wsSettings.path=$v2path' 
 cat << EOF > /lib/systemd/system/vtrui.service
 [Unit]
 Description=vtrui Service
-After=network.target
+After=network.target nss-lookup.target
+Wants=network-online.target
 
 [Service]
 User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
-ExecStop=/bin/kill -9 \$MAINPID
+ExecStop=/bin/kill -9 $MAINPID
 Restart=always
 RestartSec=2
 StartLimitBurst=0
@@ -1275,8 +1278,8 @@ soap.wsdl_cache_limit = 5
 ldap.max_links = -1
 
 [opcache]
-zend_extension=opcache.so
 opcache.enable=1
+opcache.enable_cli=1
 opcache.memory_consumption=128
 opcache.interned_strings_buffer=8
 opcache.max_accelerated_files=10000
@@ -1303,6 +1306,7 @@ user = www-data
 group = www-data
 listen = /run/php/php7.3-fpm.sock
 listen.allowed_clients = 127.0.0.1
+listen.backlog = 65536
 listen.mode = 0666
 
 pm = ondemand
