@@ -337,7 +337,6 @@ rm -rf ~/vtrui*
 
 cat << EOF > /etc/vtrui/config.json
 {
-  "dns": { "servers": [ "localhost" ] },
   "inbounds": [
     {
     "port": 11811,
@@ -356,7 +355,7 @@ cat << EOF > /etc/vtrui/config.json
     }
   ],
   "outbounds": [
-  {"protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"}},
+  {"protocol": "freedom", "settings": {}},
   {"tag": "block", "protocol": "blackhole", "settings": {}}
   ]
 }
@@ -376,7 +375,7 @@ jq --argjson v2clients "$v2clients" '.inbounds[0].settings.clients+=[$v2clients]
 done
 rm -rf /tmp/v2clients
 
-jq --arg v2path "$v2path" '.inbounds[0].streamSettings.wsSettings.path=$v2path' /etc/vtrui/config.json > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
+jq --arg v2path $v2path '.inbounds[0].streamSettings.wsSettings.path=$v2path' /etc/vtrui/config.json > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
 
 cat << EOF > /lib/systemd/system/vtrui.service
 [Unit]
@@ -391,7 +390,7 @@ LimitNPROC=64000
 LimitNOFILE=1000000
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
-ExecStop=/bin/kill -9 $MAINPID
+ExecStop=/bin/kill -9 \$MAINPID
 Restart=always
 RestartSec=2
 StartLimitBurst=0
@@ -973,9 +972,7 @@ cat >> /etc/vtrui/config.json << EOF
   "outbounds": [
     {
       "protocol": "freedom",
-      "settings": {
-        "domainStrategy": "UseIPv4"
-      }
+      "settings": {}
     },
     {
       "tag": "block",
