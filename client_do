@@ -340,7 +340,7 @@ cat << EOF > /etc/vtrui/config.json
     "tag": "dnsin",
     "port": 53,
     "protocol": "dokodemo-door",
-    "settings": {"address":"119.29.29.29","port":53,"network":"tcp,udp"}
+    "settings": {"address":"1.1.1.1","port":53,"network":"tcp,udp"}
   },
   {
     "port": 9896,
@@ -388,9 +388,9 @@ cat << EOF > /etc/vtrui/config.json
 ],
 "routing": {
   "rules": [
+    {"type":"field","inboundTag":"dnsin","outboundTag":"dnsout"},
     {"type":"field","inboundTag":"DNSflow","outboundTag":"direct"},
-    {"type":"field","ip":["geoip:private","geoip:cn","114.114.114.114","114.114.115.115","119.29.29.29","119.28.28.28","223.5.5.5","223.6.6.6"],"outboundTag":"direct"},
-    {"type":"field","inboundTag":"dnsin","outboundTag":"dnsout"}
+    {"type":"field","ip":["geoip:private","geoip:cn","114.114.114.114","114.114.115.115","119.29.29.29","119.28.28.28","223.5.5.5","223.6.6.6"],"outboundTag":"direct"}
   ]
 }
 }
@@ -405,7 +405,7 @@ jq --arg domain $domain '.outbounds[0].streamSettings.tlsSettings.serverName=$do
 jq --arg key $doh --arg value $domainip '.dns.hosts += {($key): ($value)}' |\
 jq --arg key $domain --arg value $domainip '.dns.hosts += {($key): ($value)}' > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
 
-cat << EOF > /lib/systemd/system/vtrui.service
+cat << "EOF" > /lib/systemd/system/vtrui.service
 [Unit]
 Description=vtrui Service
 After=network.target nss-lookup.target
@@ -416,9 +416,9 @@ User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
-ExecStop=/bin/kill -9 \$MAINPID
+ExecStop=/bin/kill -9 $MAINPID
+KillMode=process
 Restart=always
 RestartSec=2
 StartLimitBurst=0
@@ -602,7 +602,7 @@ option use-vc
 EOF
 
 echo
-if [[ $(curl -Is  http://www.google.com | head -n 1) =~ "OK" ]]; then
+if [[ $(curl -Is  http://www.google.com | head -n 1) =~ "HTTP" ]]; then
     echo "$statuSuccess de_GWD server connect"
     echo "$statuSuccess de_GWD server connect"
     echo "$statuSuccess de_GWD server connect"
@@ -996,9 +996,6 @@ chmod +x /usr/local/bin/Q4am
 
 cat << "EOF" > /usr/local/bin/Q4H
 #!/bin/bash
-date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
-hwclock -w
-
 rm -rf ~/client*
 rm -rf /var/log/*1*
 rm -rf /var/log/*2*
@@ -1020,6 +1017,9 @@ output=$(systemctl restart iptables-proxy)
 
 cat << "EOF" > /usr/local/bin/Q2H
 #!/bin/bash
+date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
+hwclock -w
+
 /usr/local/bin/ui-saveListBW > /dev/null 2>&1
 EOF
 chmod +x /usr/local/bin/Q2H
@@ -1227,19 +1227,6 @@ blue "----------------------"
 
 
 updateGWD(){
-if [[ $(jq -r '.v2nodeForUpdate' /usr/local/bin/0conf) = "null" ]]; then
-domain=$(jq -r '.outbounds[0].settings.vnext[0].address' /etc/vtrui/config.json)
-port=$(jq -r '.outbounds[0].settings.vnext[0].port' /etc/vtrui/config.json)
-uuidnum=$(jq -r '.outbounds[0].settings.vnext[0].users[0].id' /etc/vtrui/config.json)
-v2path=$(jq -r '.outbounds[0].streamSettings.wsSettings.path' /etc/vtrui/config.json)
-
-jq --arg domain "$domain" '.v2nodeForUpdate.address=$domain' /usr/local/bin/0conf |\
-jq --arg port "$port" '.v2nodeForUpdate.port=$port' |\
-jq --arg uuidnum "$uuidnum" '.v2nodeForUpdate.uuid=$uuidnum' |\
-jq --arg v2path "$v2path" '.v2nodeForUpdate.path=$v2path' > /tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
-chmod -R 666 /usr/local/bin/0conf
-fi
-
 cd ~
 source /etc/profile
 
