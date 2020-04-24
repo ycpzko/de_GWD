@@ -1110,7 +1110,7 @@ else
 fi
 
 blue "----------------------------------------"
-blue "Current tcp congestion control ：$(echo $(sysctl net.ipv4.tcp_congestion_control) | cut -d ' ' -f3)"
+blue "Current tcp congestion control ：$(echo $(sysctl net.ipv4.tcp_congestion_control 2>/dev/null) | cut -d ' ' -f3)"
 blue "----------------------------------------"
 
     green "==========================="
@@ -1127,7 +1127,7 @@ fi
     red    "5. Change static IP"
     red    "6. Change domain and issue new certificates"
     yellow "7. Change v2ray UUID & path"
-    yellow "8. Set v2ray upsteram"
+    green  "8. Set v2ray upsteram"
     yellow "9. Update Pi-hole"
     yellow "0. Update de_GWD"
     red    "00.AutoUpdate turn on/off"
