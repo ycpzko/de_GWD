@@ -194,7 +194,7 @@ server 223.5.5.5
 server 223.6.6.6
 EOF
 
-echo "" > /run/smartdns.pid
+rm -rf /run/smartdns.pid
 cat << "EOF" > /lib/systemd/system/smartdns.service
 [Unit]
 Description=Smart DNS server
@@ -636,6 +636,9 @@ sed -i "/Allow members of group sudo to execute any command/a\www-data ALL=(root
 
 apt install docker-ce docker-ce-cli containerd.io php7.3-fpm php7.3-common php7.3-cgi php7.3-opcache php7.3-json php7.3-sqlite3 sqlite3
 
+sed -i "/LimitNOFILE=/c\LimitNOFILE=1000000"  /lib/systemd/system/docker.service
+sed -i "/LimitNPROC=/c\LimitNPROC=1000000"  /lib/systemd/system/docker.service
+systemctl daemon-reload > /dev/null 2>&1
 systemctl enable docker
 systemctl restart docker
 
@@ -803,7 +806,7 @@ worker_processes auto;
 worker_rlimit_nofile 100000;
 
 events {
-    worker_connections  4096;
+    worker_connections  100000;
     multi_accept on;
     use epoll;
 }
