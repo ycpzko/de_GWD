@@ -512,8 +512,8 @@ server {
   ssl_prefer_server_ciphers on;
   ssl_ciphers TLS13+AESGCM+AES128:TLS13+AESGCM+AES256:TLS13+CHACHA20:EECDH+ECDSA+AESGCM+AES128:EECDH+ECDSA+CHACHA20:EECDH+ECDSA+AESGCM+AES256:EECDH+ECDSA+AES128+SHA:EECDH+ECDSA+AES256+SHA:EECDH+aRSA+AESGCM+AES128:EECDH+aRSA+CHACHA20:EECDH+aRSA+AESGCM+AES256:EECDH+aRSA+AES128+SHA:EECDH+aRSA+AES256+SHA:RSA+AES128+SHA:RSA+AES256+SHA:RSA+3DES;
   ssl_session_timeout 10m;
-  ssl_session_cache shared:le_nginx_SSL:10m;
-  ssl_buffer_size 1400;
+  ssl_session_cache shared:SSL:10m;
+  ssl_buffer_size 4k;
 
   ssl_early_data on;
   proxy_set_header Early-Data \$ssl_early_data;
@@ -1007,7 +1007,7 @@ ethernetnum=$(ip --oneline link show up | grep -v "lo" | awk '{print$2;exit}' | 
 localaddr=$(ip a | grep "$ethernetnum" | awk '{print $2}' | awk 'END {print}' | cut -d'/' -f1)
 
 domain=$(awk '/server_name/ {print$2;exit}' /etc/nginx/conf.d/default.conf | sed 's/.$//')
-port=$(awk '/ssl http2 spdy fastopen=64 reuseport/ {print$2}' /etc/nginx/conf.d/default.conf)
+port=$(awk '/ssl http2 fastopen=64 reuseport/ {print$2}' /etc/nginx/conf.d/default.conf)
 topDomain=$(echo $domain | rev | awk -F. '{print $1"."$2}' | rev)
 
 v2uuids=$(jq -r '.inbounds[0].settings.clients[].id' /etc/vtrui/config.json)
