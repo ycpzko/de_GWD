@@ -26,10 +26,10 @@ statusFailed=$(red "[ failed ]")
 
 
 preInstall(){
-systemctl stop iptables-proxy > /dev/null 2>&1
+systemctl stop iptables-proxy >/dev/null 2>&1
 
-systemctl mask --now systemd-resolved > /dev/null 2>&1
-systemctl daemon-reload > /dev/null 2>&1
+systemctl mask --now systemd-resolved >/dev/null 2>&1
+systemctl daemon-reload >/dev/null 2>&1
 
 rm -rf /etc/resolv.conf
 cat << EOF > /etc/resolv.conf
@@ -61,9 +61,9 @@ deb http://mirrors.aliyun.com/debian $(cat /etc/os-release | grep VERSION= | cut
 EOF
 fi
 
-apt update && apt install sudo locales net-tools dnsutils ipset wget curl git jq unzip ca-certificates haveged subversion rsync lighttpd php-common php-cgi php-sqlite3 bc
+apt update && apt install sudo locales net-tools dnsutils ipset wget curl git jq unzip ca-certificates haveged subversion rsync lighttpd bc
 source /etc/profile
-systemctl enable --now haveged > /dev/null 2>&1
+systemctl enable --now haveged >/dev/null 2>&1
 
 dpkg --configure -a
 
@@ -174,7 +174,7 @@ hwclock -w
 
 
 installSmartDNS(){
-dpkg -P smartdns > /dev/null 2>&1
+dpkg -P smartdns >/dev/null 2>&1
 
 if [[ $architecture = "arm64" ]]; then
   wget --no-check-certificate -O ~/smartdns.deb $smartdns_arm64
@@ -235,15 +235,10 @@ systemctl restart smartdns
 installDOH(){
 rm -rf /usr/local/bin/doh-client
 
-portcheck=$(echo $port | grep '^[0-9]\+$')
-if [[ $portcheck = "" ]] || [[ $portcheck = "443" ]]; then
-doh=$domain
-port="443"
-else
-doh="$domain:$port"
-fi
-
-domainip=$(nslookup $domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
+doh1Domain=$(echo $doh1 | cut -d/ -f1 | cut -d: -f1)
+doh2Domain=$(echo $doh2 | cut -d/ -f1 | cut -d: -f1)
+doh1IP=$(nslookup $doh1Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
+doh2IP=$(nslookup $doh2Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
 
 if [[ $architecture = "arm64" ]]; then
   wget --no-check-certificate -O ~/doh.zip $mirrorSite/doharm64.zip
@@ -280,18 +275,21 @@ no_ipv6 = true
 verbose = false
 EOF
 
-doh_upstream='url = "https:\/\/'$doh'\/dq"'
-sed -i "/url/c\\$doh_upstream" /etc/dns-over-https/doh-client.conf
+doh_upstream1='url = "https:\/\/'$doh1'"'
+doh_upstream2='url = "https:\/\/'$doh2'"'
+
+sed -i "$(sed -n -e '/url =/=' /etc/dns-over-https/doh-client.conf | awk NR==1)s?.*?$doh_upstream1?" /etc/dns-over-https/doh-client.conf
+sed -i "$(sed -n -e '/url =/=' /etc/dns-over-https/doh-client.conf | awk NR==2)s?.*?$doh_upstream2?" /etc/dns-over-https/doh-client.conf
 
 mkdir -p /etc/NetworkManager/dispatcher.d/
 cat << "EOF" > /etc/NetworkManager/dispatcher.d/doh-client
 #!/bin/bash
 case "$2" in
     up)
-        /usr/bin/systemctl is-active doh-client.service > /dev/null && /usr/bin/systemctl restart doh-client.service
+        /usr/bin/systemctl is-active doh-client.service >/dev/null && /usr/bin/systemctl restart doh-client.service
         ;;
     down)
-        /usr/bin/systemctl is-active doh-client.service > /dev/null && /usr/bin/systemctl restart doh-client.service
+        /usr/bin/systemctl is-active doh-client.service >/dev/null && /usr/bin/systemctl restart doh-client.service
         ;;
     *)
         exit 0
@@ -420,8 +418,8 @@ jq --arg uuidnum $uuidnum '.outbounds[0].settings.vnext[0].users[0].id=$uuidnum'
 jq --arg v2path $v2path '.outbounds[0].streamSettings.wsSettings.path=$v2path' |\
 jq --arg domain $domain '.outbounds[0].streamSettings.wsSettings.headers.Host=$domain' |\
 jq --arg domain $domain '.outbounds[0].streamSettings.tlsSettings.serverName=$domain' |\
-jq --arg key $doh --arg value $domainip '.dns.hosts += {($key): ($value)}' |\
-jq --arg key $domain --arg value $domainip '.dns.hosts += {($key): ($value)}' > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
+jq --arg key $doh1Domain --arg value $doh1IP '.dns.hosts += {($key): ($value)}' |\
+jq --arg key $doh2Domain --arg value $doh2IP '.dns.hosts += {($key): ($value)}' >/tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
 
 cat << "EOF" > /lib/systemd/system/vtrui.service
 [Unit]
@@ -454,7 +452,8 @@ systemctl restart vtrui
 
 
 installIptablesProxy(){
-echo $domainip >> /usr/local/bin/chnrouteset
+echo $doh1IP >> /usr/local/bin/chnrouteset
+echo $doh2IP >> /usr/local/bin/chnrouteset
 
 cat << EOF > /usr/local/bin/iptables-proxy-up
 #!/bin/bash
@@ -646,6 +645,8 @@ fi
 
 apt update && apt upgrade && apt autoremove && apt autoclean
 
+apt install php-common php-cgi php-sqlite3
+
 sed -i "/www-data/d" /etc/sudoers
 sed -i "/Allow members of group sudo to execute any command/a\www-data ALL=(root)  NOPASSWD:ALL" /etc/sudoers
 }
@@ -678,8 +679,8 @@ bash <(wget --no-check-certificate -qO- http://raw.githubusercontent.com/pi-hole
 
 
 piholeSet(){
-systemctl mask --now dhcpcd > /dev/null 2>&1
-systemctl daemon-reload > /dev/null 2>&1
+systemctl mask --now dhcpcd >/dev/null 2>&1
+systemctl daemon-reload >/dev/null 2>&1
 
 rm -rf /etc/resolv.conf
 echo "" > /etc/resolvconf/run/interface/original.resolvconf
@@ -763,7 +764,7 @@ TimeoutSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload > /dev/null 2>&1
+systemctl daemon-reload >/dev/null 2>&1
 
 mkdir -p /var/www/html/restore
 chown -R www-data:www-data /var/www/html
@@ -826,12 +827,12 @@ ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
 resolvconf -u
 
 pihole restartdns
-output=$(/usr/local/bin/ui-NodeDThide > /dev/null 2>&1)
-output=$(/usr/local/bin/ui-saveNode > /dev/null 2>&1)
-output=$(/usr/local/bin/ui-saveListBW > /dev/null 2>&1)
-output=$(/usr/local/bin/ui-updateGen > /dev/null 2>&1)
+output=$(/usr/local/bin/ui-NodeDThide >/dev/null 2>&1)
+output=$(/usr/local/bin/ui-saveNode >/dev/null 2>&1)
+output=$(/usr/local/bin/ui-saveListBW >/dev/null 2>&1)
+output=$(/usr/local/bin/ui-updateGen >/dev/null 2>&1)
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null"  ]]; then
-output=$(/usr/local/bin/ui-markThis > /dev/null 2>&1)
+output=$(/usr/local/bin/ui-markThis >/dev/null 2>&1)
 fi
 output=$(systemctl restart iptables-proxy)
 
@@ -840,7 +841,7 @@ cat << "EOF" > /usr/local/bin/Q2H
 date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
 hwclock -w
 
-/usr/local/bin/ui-saveListBW > /dev/null 2>&1
+/usr/local/bin/ui-saveListBW >/dev/null 2>&1
 EOF
 chmod +x /usr/local/bin/Q2H
 
@@ -871,6 +872,11 @@ installGWD(){
     read gatewayaddr
 
     green "========================="
+    green " DoH"
+    green "========================="
+    read doh1
+
+    green "========================="
     green " V2ray domain"
     green "========================="
     read v2servn
@@ -887,8 +893,15 @@ installGWD(){
 
 cd ~
 
+doh2=$doh1
+
 domain=$(echo $v2servn | cut -d : -f1)
 port=$(echo $v2servn | cut -d : -f2)
+portCheck=$(echo $port | grep '^[0-9]\+$')
+if [[ -z $portCheck ]]; then
+port="443"
+fi
+
 ethernetnum=$(ip --oneline link show up | grep -v "lo" | awk '{print$2;exit}' | cut -d':' -f1 | cut -d'@' -f1)
 
 piholePW="0000000000000000000000000000000000000000000000000000000000000000"
@@ -941,8 +954,8 @@ jq --arg localIP "$localaddr" '.address.localIP=$localIP' |\
 jq --arg upstreamIP "$gatewayaddr" '.address.upstreamIP=$upstreamIP' |\
 jq '.address.dhcp=""' |\
 jq '.doh={}' |\
-jq --arg doh1 "$v2servn" '.doh.doh1=$doh1' |\
-jq --arg doh2 "$v2servn" '.doh.doh2=$doh2' |\
+jq --arg doh1 "$doh1" '.doh.doh1=$doh1' |\
+jq --arg doh2 "$doh2" '.doh.doh2=$doh2' |\
 jq '.v2ad=""' |\
 jq '.v2node=[]' |\
 jq --arg domain "$v2servn" '.v2node[0].domain=$domain' |\
@@ -955,7 +968,7 @@ jq --arg domain "$domain" '.v2nodeForUpdate.address=$domain' |\
 jq --arg port "$port" '.v2nodeForUpdate.port=$port' |\
 jq --arg uuidnum "$uuidnum" '.v2nodeForUpdate.uuid=$uuidnum' |\
 jq --arg v2path "$v2path" '.v2nodeForUpdate.path=$v2path' |\
-jq --arg updateAddr "$updateAddr" '.updateAddr=$updateAddr' > /tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
+jq --arg updateAddr "$updateAddr" '.updateAddr=$updateAddr' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 chmod -R 666 /usr/local/bin/0conf
 
 installWebUI
@@ -973,7 +986,7 @@ sudo pihole -a -p
 
 piholePW=$(awk '/WEBPASSWORD/' /etc/pihole/setupVars.conf | cut -d = -f2)
 
-jq --arg piholePW "$piholePW" '.pihole = $piholePW' /usr/local/bin/0conf > /tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
+jq --arg piholePW "$piholePW" '.pihole = $piholePW' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 chmod -R 666 /usr/local/bin/0conf
 blue "------------------------------"
 blue "Change Pi-hole password [done]"
@@ -1028,7 +1041,7 @@ nameserver 8.8.8.8
 option use-vc
 EOF
 
-jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /etc/vtrui/config.json > /tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
+jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /etc/vtrui/config.json >/tmp/vtrui_temp && mv -f /tmp/vtrui_temp /etc/vtrui/config.json
 output=$(systemctl restart iptables-proxy)
 sleep 3
 
@@ -1040,8 +1053,8 @@ if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
 /usr/local/bin/ui-dhcpUP
 fi
 
-output=$(/usr/local/bin/ui-NodeDThide > /dev/null 2>&1)
-output=$(/usr/local/bin/ui-saveListBW > /dev/null 2>&1)
+output=$(/usr/local/bin/ui-NodeDThide >/dev/null 2>&1)
+output=$(/usr/local/bin/ui-saveListBW >/dev/null 2>&1)
 systemctl restart iptables-proxy
 blue "----------------------"
 blue "Install Pi-hole [done]"
@@ -1055,6 +1068,9 @@ cd ~
 source /etc/profile
 
 piholePW=$(jq -r '.pihole' /usr/local/bin/0conf)
+
+doh1=$(jq -r '.doh.doh1' /usr/local/bin/0conf)
+doh2=$(jq -r '.doh.doh2' /usr/local/bin/0conf)
 
 domain=$(jq -r '.v2nodeForUpdate.address' /usr/local/bin/0conf)
 port=$(jq -r '.v2nodeForUpdate.port' /usr/local/bin/0conf)
