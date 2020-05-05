@@ -82,7 +82,8 @@ User=nobody
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=yes
 ExecStart=/usr/local/bin/doh-server -conf /etc/dns-over-https/doh-server.conf
 Restart=always
 RestartSec=2
@@ -97,11 +98,58 @@ systemctl restart doh-server
 
 
 
+makeSSL_D(){
+mkdir -p /var/www/ssl
+rm -rf /var/www/ssl/*
+
+apt install netcat socat
+
+export CF_Key="$CFapikey"
+export CF_Email="$CFemail"
+
+curl https://get.acme.sh | sh
+~/.acme.sh/acme.sh --upgrade  --auto-upgrade
+~/.acme.sh/acme.sh --issue --dns dns_cf -d $topDomain -d *.$topDomain --keylength ec-256
+~/.acme.sh/acme.sh --installcert -d $topDomain --ecc \
+               --keypath        /var/www/ssl/$topDomain.key  \
+               --fullchain-file /var/www/ssl/fullchain.cer \
+               --reloadcmd     "docker restart nginx >/dev/null 2>&1"
+openssl dhparam -out /var/www/ssl/dhparam.pem 2048
+
+cat << EOF > /var/www/ssl/update_ocsp_cache
+#!/bin/bash
+wget -O ~/intermediate.pem https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem
+wget -O ~/root.pem https://ssl-tools.net/certificates/dac9024f54d8f6df94935fb1732638ca6ad77c13.pem
+mv ~/intermediate.pem /var/www/ssl
+mv ~/root.pem /var/www/ssl
+cat /var/www/ssl/intermediate.pem > /var/www/ssl/bundle.pem
+cat /var/www/ssl/root.pem >> /var/www/ssl/bundle.pem
+
+openssl ocsp -no_nonce \
+    -issuer  /var/www/ssl/intermediate.pem \
+    -cert    /var/www/ssl/fullchain.cer \
+    -CAfile  /var/www/ssl/bundle.pem \
+    -VAfile  /var/www/ssl/bundle.pem \
+    -url     http://ocsp.int-x3.letsencrypt.org \
+    -respout /var/www/ssl/ocsp.resp
+EOF
+chmod +x /var/www/ssl/update_ocsp_cache
+/var/www/ssl/update_ocsp_cache
+
+crontab -l > ~/now.cron
+sed -i '/\/var\/www\/ssl\/update_ocsp_cache/d' ~/now.cron
+echo '0 0 * * 6 /var/www/ssl/update_ocsp_cache' >> ~/now.cron
+crontab ~/now.cron
+rm -rf ~/now.cron
+}
+
+
+
 clifwd_nginxWebConf(){
 rm -rf /etc/nginx/conf.d/default.conf
 cat << EOF > /etc/nginx/conf.d/default.conf
 server {
-  listen $clifwd_port ssl http2 fastopen=64 reuseport;
+  listen $clifwd_port ssl http2 fastopen=128 reuseport;
   server_name $clifwd_domain;
   root /var/www/html;
   index index.php index.html index.htm;
@@ -173,73 +221,18 @@ location $clifwd_v2path {
 }
 }
 EOF
-}
 
-
-
-clifwd_installNginxDo(){
 docker stop nginx >/dev/null 2>&1
 docker rm nginx >/dev/null 2>&1
-
-docker rmi jacyl4/nginx_tls1.3:latest >/dev/null 2>&1
-docker pull jacyl4/nginx_tls1.3:latest
-
-mkdir -p /var/www/ssl
 
 docker run -d --name=nginx --net=host --restart=always \
 -v /etc/localtime:/etc/localtime \
 -v /etc/nginx/nginx.conf:/etc/nginx/nginx.conf \
 -v /etc/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf \
+-v /run/php/:/run/php/ \
 -v /var/www/html/:/var/www/html/ \
 -v /var/www/ssl/:/var/www/ssl/ \
--v /run/php/:/run/php/ \
 jacyl4/nginx_tls1.3:latest
-}
-
-
-
-makeSSL_D(){
-apt update && apt install netcat socat
-
-export CF_Key="$CFapikey"
-export CF_Email="$CFemail"
-
-curl https://get.acme.sh | sh
-~/.acme.sh/acme.sh --upgrade  --auto-upgrade
-~/.acme.sh/acme.sh --issue --dns dns_cf -d $topDomain -d *.$topDomain --keylength ec-256
-~/.acme.sh/acme.sh --installcert -d $topDomain --ecc \
-               --keypath        /var/www/ssl/$topDomain.key  \
-               --fullchain-file /var/www/ssl/fullchain.cer \
-               --reloadcmd     "docker restart nginx >/dev/null 2>&1"
-openssl dhparam -out /var/www/ssl/dhparam.pem 2048
-
-cat << EOF > /var/www/ssl/update_ocsp_cache
-#!/bin/bash
-wget -O ~/intermediate.pem https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem
-wget -O ~/root.pem https://ssl-tools.net/certificates/dac9024f54d8f6df94935fb1732638ca6ad77c13.pem
-mv ~/intermediate.pem /var/www/ssl
-mv ~/root.pem /var/www/ssl
-cat /var/www/ssl/intermediate.pem > /var/www/ssl/bundle.pem
-cat /var/www/ssl/root.pem >> /var/www/ssl/bundle.pem
-
-openssl ocsp -no_nonce \
-    -issuer  /var/www/ssl/intermediate.pem \
-    -cert    /var/www/ssl/fullchain.cer \
-    -CAfile  /var/www/ssl/bundle.pem \
-    -VAfile  /var/www/ssl/bundle.pem \
-    -url     http://ocsp.int-x3.letsencrypt.org \
-    -respout /var/www/ssl/ocsp.resp
-EOF
-chmod +x /var/www/ssl/update_ocsp_cache
-/var/www/ssl/update_ocsp_cache
-
-crontab -l > ~/now.cron
-sed -i '/\/var\/www\/ssl\/update_ocsp_cache/d' ~/now.cron
-echo '0 0 * * 6 /var/www/ssl/update_ocsp_cache' >> ~/now.cron
-crontab ~/now.cron
-rm -rf ~/now.cron
-
-docker restart nginx
 }
 
 
@@ -280,7 +273,7 @@ clifwd_uuidnum=$(jq -r '.clifwd.clifwd_uuidnum[]' /usr/local/bin/0conf)
 
 jq 'del(.inbounds[2])' /etc/vtrui/config.json >/tmp/vtrui_temp
 
-vtruiIn='{"port":11811,"listen":"127.0.0.1","protocol":"vmess","sniffing":{"enabled":true,"destOverride":["http","tls"]},"settings":{"clients":[]},"streamSettings":{"network":"ws","wsSettings":{"path": "/0000"}}}'
+vtruiIn='{"port":11811,"listen":"127.0.0.1","protocol":"vmess","sniffing":{"enabled":true,"destOverride":["http","tls"]},"settings":{"clients":[]},"streamSettings":{"network":"ws","wsSettings":{"path":"/0000"},"sockopt":{"tcpFastOpen":true}}}'
 
 jq --argjson vtruiIn "$vtruiIn" '.inbounds[2] = $vtruiIn' /tmp/vtrui_temp |\
 jq --arg clifwd_v2path $clifwd_v2path '.inbounds[2].streamSettings.wsSettings.path=$clifwd_v2path' >/tmp/vtrui_temp2 && mv -f /tmp/vtrui_temp2 /tmp/vtrui_temp
@@ -445,8 +438,8 @@ installclifwd(){
     
 cd ~
 
-clifwd_domain=$(echo $clifwd_domainP | cut -d : -f1)
-clifwd_port=$(echo $clifwd_domainP | cut -d : -f2)
+clifwd_domain=$(echo $clifwd_domainP | cut -d: -f1)
+clifwd_port=$(echo $clifwd_domainP | cut -d: -f2)
 topDomain=$(echo $clifwd_domain | rev | awk -F. '{print $1"."$2}' | rev)
 
 wget --no-check-certificate -O ~/client_do $mirrorSite/client_do
@@ -468,11 +461,9 @@ clifwd_iptablesProxy
 
 clifwd_installDOHser
 
-clifwd_nginxWebConf
-
-clifwd_installNginxDo
-
 makeSSL_D
+
+clifwd_nginxWebConf
 
 clifwd_installWebUI
 
@@ -487,8 +478,8 @@ blue "----------------------------"
 installBBRplus(){
 apt install wget
 mkdir -p ~/bbrkernel && cd ~/bbrkernel
-wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-headers-4.14.168-bbrplus_4.14.168-bbrplus-1-$(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1)_amd64.deb
-wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-image-4.14.168-bbrplus_4.14.168-bbrplus-1-$(cat /etc/os-release | grep VERSION= | cut -d '(' -f2 | cut -d ')' -f1)_amd64.deb
+wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-headers-4.14.168-bbrplus_4.14.168-bbrplus-1-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
+wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-image-4.14.168-bbrplus_4.14.168-bbrplus-1-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
 dpkg -i linux-headers-*.deb
 dpkg -i linux-image-*.deb
 update-grub
@@ -529,7 +520,7 @@ reboot
 clifwd_change_piholeAdmin(){
 sudo pihole -a -p
 
-piholePW=$(awk '/WEBPASSWORD/' /etc/pihole/setupVars.conf | cut -d = -f2)
+piholePW=$(awk '/WEBPASSWORD/' /etc/pihole/setupVars.conf | cut -d= -f2)
 
 jq --arg piholePW "$piholePW" '.pihole = $piholePW' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 chmod -R 666 /usr/local/bin/0conf
@@ -556,8 +547,8 @@ changeDomain(){
     green "=============================="
     read CFemail
 
-clifwd_domain=$(echo $clifwd_domainP | cut -d : -f1)
-clifwd_port=$(echo $clifwd_domainP | cut -d : -f2)
+clifwd_domain=$(echo $clifwd_domainP | cut -d: -f1)
+clifwd_port=$(echo $clifwd_domainP | cut -d: -f2)
 topDomain=$(echo $clifwd_domain | rev | awk -F. '{print $1"."$2}' | rev)
 
 clifwd_v2path=$(jq -r '.clifwd.clifwd_v2path' /usr/local/bin/0conf)
@@ -565,9 +556,9 @@ clifwd_uuidnum=$(jq -r '.clifwd.clifwd_uuidnum[]' /usr/local/bin/0conf)
 
 rm -rf /var/www/ssl/*
 
-clifwd_nginxWebConf
-
 makeSSL_D
+
+clifwd_nginxWebConf
 
 jq '.clifwd={}' /usr/local/bin/0conf |\
 jq --arg clifwd_domain "$clifwd_domain" '.clifwd.clifwd_domain=$clifwd_domain' |\
@@ -581,6 +572,24 @@ blue "Change domain and issue new certificates [done]"
 blue "-----------------------------------------------"
 }
 
+
+
+clifwd_installNginxDo(){
+docker stop nginx >/dev/null 2>&1
+docker rm nginx >/dev/null 2>&1
+
+docker rmi jacyl4/nginx_tls1.3:latest >/dev/null 2>&1
+docker pull jacyl4/nginx_tls1.3:latest
+
+docker run -d --name=nginx --net=host --restart=always \
+-v /etc/localtime:/etc/localtime \
+-v /etc/nginx/nginx.conf:/etc/nginx/nginx.conf \
+-v /etc/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf \
+-v /run/php/:/run/php/ \
+-v /var/www/html/:/var/www/html/ \
+-v /var/www/ssl/:/var/www/ssl/ \
+jacyl4/nginx_tls1.3:latest
+}
 
 
 clifwd_installWGcore(){
@@ -772,7 +781,7 @@ else
 fi
 
 blue "----------------------------------------"
-blue "Current tcp congestion control ：$(echo $(sysctl net.ipv4.tcp_congestion_control 2>/dev/null) | cut -d ' ' -f3)"
+blue "Current tcp congestion control ：$(echo $(sysctl net.ipv4.tcp_congestion_control 2>/dev/null) | cut -d' ' -f3)"
 blue "----------------------------------------"
 
     green "================================"
