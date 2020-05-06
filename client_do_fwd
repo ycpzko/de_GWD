@@ -82,8 +82,7 @@ User=nobody
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
-NoNewPrivileges=yes
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=/usr/local/bin/doh-server -conf /etc/dns-over-https/doh-server.conf
 Restart=always
 RestartSec=2
@@ -273,7 +272,7 @@ clifwd_uuidnum=$(jq -r '.clifwd.clifwd_uuidnum[]' /usr/local/bin/0conf)
 
 jq 'del(.inbounds[2])' /etc/vtrui/config.json >/tmp/vtrui_temp
 
-vtruiIn='{"port":11811,"listen":"127.0.0.1","protocol":"vmess","sniffing":{"enabled":true,"destOverride":["http","tls"]},"settings":{"clients":[]},"streamSettings":{"network":"ws","wsSettings":{"path":"/0000"},"sockopt":{"tcpFastOpen":true}}}'
+vtruiIn='{"port":11811,"listen":"127.0.0.1","protocol":"vmess","sniffing":{"enabled":true,"destOverride":["http","tls"]},"settings":{"clients":[]},"streamSettings":{"network":"ws","wsSettings":{"path":"/0000"}}}'
 
 jq --argjson vtruiIn "$vtruiIn" '.inbounds[2] = $vtruiIn' /tmp/vtrui_temp |\
 jq --arg clifwd_v2path $clifwd_v2path '.inbounds[2].streamSettings.wsSettings.path=$clifwd_v2path' >/tmp/vtrui_temp2 && mv -f /tmp/vtrui_temp2 /tmp/vtrui_temp
@@ -360,6 +359,11 @@ for chnroute in $chnroute ; do
  echo "add chnroute $chnroute"
 done
 } > /usr/local/bin/chnrouteset
+
+ipset -F chnroute
+for ipchnroute in $(cat /usr/local/bin/chnroute.txt); do
+  ipset add chnroute $ipchnroute
+done
 fi
 EOF
 chmod +x /usr/local/bin/Q4am
@@ -381,7 +385,7 @@ chmod +x /usr/local/bin/Q4H
 output=$(/usr/local/bin/ui-NodeDThide >/dev/null 2>&1)
 output=$(/usr/local/bin/ui-saveListBW >/dev/null 2>&1)
 output=$(/usr/local/bin/ui-updateGen >/dev/null 2>&1)
-if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null"  ]]; then
+if [[ -n $(jq -r '.address.alias' /usr/local/bin/0conf) ]]; then
 output=$(/usr/local/bin/ui-markThis >/dev/null 2>&1)
 fi
 output=$(systemctl restart iptables-proxy)

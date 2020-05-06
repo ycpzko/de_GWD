@@ -305,8 +305,7 @@ User=nobody
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
-NoNewPrivileges=yes
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=/usr/local/bin/doh-server -conf /etc/dns-over-https/doh-server.conf
 Restart=always
 RestartSec=2
@@ -344,20 +343,17 @@ cat << EOF > /etc/vtrui/config.json
     "port":11811,
     "listen":"127.0.0.1",
     "protocol":"vmess",
-    "sniffing":{"enabled":true,"destOverride":["http","tls"]},
     "settings":{
       "clients":[]
       },
     "streamSettings": {
       "network":"ws",
-      "wsSettings":{"path":"/0000"},
-      "sockopt":{"tcpFastOpen":true}
+      "wsSettings":{"path":"/0000"}
       }
     }
   ],
   "outbounds": [
-  {"protocol":"freedom","settings":{}},
-  {"tag":"block","protocol":"blackhole"}
+  {"protocol":"freedom","settings":{}}
   ]
 }
 EOF
@@ -389,8 +385,6 @@ User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
-NoNewPrivileges=yes
 ExecStart=/usr/bin/vtrui/vtrui -config /etc/vtrui/config.json
 ExecStop=/bin/kill -9 $MAINPID
 Restart=always
@@ -1098,8 +1092,7 @@ cat >> /etc/vtrui/config.json << EOF
       "tlsSettings":{
         "serverName":"$domain",
         "allowInsecure":false
-        },
-      "sockopt":{"tcpFastOpen":true}
+        }
       }
     }
   ]
@@ -1114,8 +1107,7 @@ elif [[ "$v2rayupstreamyn" = "N" ]] || [[ "$v2rayupstreamyn" = "n" ]]; then
 sed -i '/"outbounds":/,$d' /etc/vtrui/config.json
 cat >> /etc/vtrui/config.json << EOF
   "outbounds": [
-  {"protocol":"freedom","settings":{}},
-  {"tag":"block","protocol":"blackhole"}
+  {"protocol":"freedom","settings":{}}
   ]
 }
 EOF
