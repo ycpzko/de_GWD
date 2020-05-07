@@ -184,7 +184,7 @@ location ~ /\.(?!well-known).* {
 }
   
 location ~* \.php$ {
-  fastcgi_pass            unix:/run/php/php7.3-fpm.sock;
+  fastcgi_pass            unix:/run/php/php-fpm.sock;
   fastcgi_index           index.php;
   fastcgi_split_path_info ^(.+\.php)(.*)$;
   include                 fastcgi_params;
@@ -195,12 +195,6 @@ location /dq {
   proxy_pass                http://127.0.0.1:8053/dq;
   proxy_set_header          Host \$host;
   proxy_set_header          X-Real-IP \$remote_addr;
-  proxy_connect_timeout     43200000;
-  proxy_send_timeout        43200000;
-  proxy_read_timeout        43200000;
-  proxy_redirect            off;
-  proxy_buffering           off;
-  proxy_buffer_size         4k;
 }
 
 location $clifwd_v2path {
@@ -211,9 +205,9 @@ location $clifwd_v2path {
   proxy_set_header          Connection "upgrade";
   proxy_set_header          X-Real-IP \$remote_addr;
   proxy_set_header          X-Forwarded-For \$proxy_add_x_forwarded_for;
-  proxy_connect_timeout     43200000;
-  proxy_send_timeout        43200000;
-  proxy_read_timeout        43200000;
+  proxy_connect_timeout     300;
+  proxy_send_timeout        300;
+  proxy_read_timeout        300;
   proxy_redirect            off;
   proxy_buffering           off;
   proxy_buffer_size         4k;
@@ -239,6 +233,9 @@ jacyl4/nginx_tls1.3:latest
 clifwd_installWebUI(){
 rm -rf /usr/local/bin/ui-*
 rm -rf /var/www/html/gwd/*.php
+rm -rf /var/www/html/gwd/vendor
+rm -rf /var/www/html/gwd/css
+rm -rf /var/www/html/gwd/js
 cd ~
 
 if [[ ! -d "/var/www/html/gwd" ]]; then
@@ -385,7 +382,7 @@ chmod +x /usr/local/bin/Q4H
 output=$(/usr/local/bin/ui-NodeDThide >/dev/null 2>&1)
 output=$(/usr/local/bin/ui-saveListBW >/dev/null 2>&1)
 output=$(/usr/local/bin/ui-updateGen >/dev/null 2>&1)
-if [[ -n $(jq -r '.address.alias' /usr/local/bin/0conf) ]]; then
+if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
 output=$(/usr/local/bin/ui-markThis >/dev/null 2>&1)
 fi
 output=$(systemctl restart iptables-proxy)
@@ -768,12 +765,12 @@ else
     echo "[$statusBAD] V2RAY          [start failed]"
 fi
 
-if [[ $(systemctl is-active php7.3-fpm) = "active" ]]; then
-    echo "[$statusGOOD] PHP7.3-FPM     [working]"
-elif [ ! -f "/etc/php/7.3/fpm/php-fpm.conf" ]; then
-    echo "[$statusBAD] PHP7.3-FPM     [not installed]"
+if [[ $(systemctl is-active php7.4-fpm) = "active" ]]; then
+    echo "[$statusGOOD] php7.4-FPM     [working]"
+elif [ ! -f "/etc/php/7.4/fpm/php-fpm.conf" ]; then
+    echo "[$statusBAD] php7.4-FPM     [not installed]"
 else
-    echo "[$statusBAD] PHP7.3-FPM     [start failed]"
+    echo "[$statusBAD] php7.4-FPM     [start failed]"
 fi
 
 if [[ $(systemctl is-active docker) = "active" ]]; then

@@ -338,6 +338,7 @@ rm -rf ~/vtrui*
 
 cat << EOF > /etc/vtrui/config.json
 {
+  "dns":{"servers":["127.0.0.1"]},
   "inbounds": [
     {
     "port":11811,
@@ -353,7 +354,7 @@ cat << EOF > /etc/vtrui/config.json
     }
   ],
   "outbounds": [
-  {"protocol":"freedom","settings":{}}
+  {"protocol":"freedom","settings":{"domainStrategy":"UseIPv4"}}
   ]
 }
 EOF
@@ -503,7 +504,6 @@ docker pull jacyl4/nginx_tls1.3:latest
 
 if [[ -d "/etc/php" ]]; then
 mkdir -p /run/php
-touch /run/php/php7.3-fpm.sock
 chown -R www-data:www-data /run/php
 
 docker run -d --name=nginx --net=host --restart=always \
@@ -702,12 +702,6 @@ location /dq {
   proxy_pass                http://127.0.0.1:8053/dq;
   proxy_set_header          Host \$host;
   proxy_set_header          X-Real-IP \$remote_addr;
-  proxy_connect_timeout     43200000;
-  proxy_send_timeout        43200000;
-  proxy_read_timeout        43200000;
-  proxy_redirect            off;
-  proxy_buffering           off;
-  proxy_buffer_size         4k;
 }
 
 location $v2path {
@@ -718,9 +712,9 @@ location $v2path {
   proxy_set_header          Connection "upgrade";
   proxy_set_header          X-Real-IP \$remote_addr;
   proxy_set_header          X-Forwarded-For \$proxy_add_x_forwarded_for;
-  proxy_connect_timeout     43200000;
-  proxy_send_timeout        43200000;
-  proxy_read_timeout        43200000;
+  proxy_connect_timeout     300;
+  proxy_send_timeout        300;
+  proxy_read_timeout        300;
   proxy_redirect            off;
   proxy_buffering           off;
   proxy_buffer_size         4k;
@@ -1107,7 +1101,7 @@ elif [[ "$v2rayupstreamyn" = "N" ]] || [[ "$v2rayupstreamyn" = "n" ]]; then
 sed -i '/"outbounds":/,$d' /etc/vtrui/config.json
 cat >> /etc/vtrui/config.json << EOF
   "outbounds": [
-  {"protocol":"freedom","settings":{}}
+  {"protocol":"freedom","settings":{"domainStrategy":"UseIPv4"}}
   ]
 }
 EOF
