@@ -826,15 +826,6 @@ EOF
 chmod +x /usr/local/bin/Q4H
 /usr/local/bin/Q4H
 
-rm -rf /etc/resolv.conf
-echo "" > /etc/resolvconf/run/interface/original.resolvconf
-echo "" > /etc/resolvconf/resolv.conf.d/original
-echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "option use-vc"  > /etc/resolvconf/resolv.conf.d/tail
-ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
-resolvconf -u
-
-pihole restartdns
 output=$(/usr/local/bin/ui-NodeDThide >/dev/null 2>&1)
 output=$(/usr/local/bin/ui-saveNode >/dev/null 2>&1)
 output=$(/usr/local/bin/ui-saveListBW >/dev/null 2>&1)
@@ -1159,7 +1150,7 @@ blue "----------------------------------------"
     echo
     green  "1. Install de_GWD"
     green  "2. Change de_GWD password"
-    yellow "8. Install/Update WiregGard"
+    yellow "3. Install/Update WiregGard"
     yellow "9. Update Pi-hole"
     yellow "0. Update de_GWD"
     red    "CTRL+C EXIT"
@@ -1174,7 +1165,7 @@ blue "----------------------------------------"
     change_piholeAdmin
     start_menu
     ;;
-    8)
+    3)
     installWGcore
     start_menu
     ;;

@@ -29,8 +29,8 @@ systemctl daemon-reload >/dev/null 2>&1
 rm -rf /etc/resolv.conf
 cat << EOF > /etc/resolv.conf
 nameserver 1.1.1.1
-nameserver 1.0.0.1
 nameserver 8.8.8.8
+nameserver 1.0.0.1
 nameserver 8.8.4.4
 EOF
 
@@ -220,6 +220,8 @@ PIHOLE_INTERFACE=$ethernetnum
 IPV4_ADDRESS=$localaddr/24
 PIHOLE_DNS_1=1.1.1.1
 PIHOLE_DNS_2=8.8.8.8
+PIHOLE_DNS_3=1.0.0.1
+PIHOLE_DNS_4=8.8.4.4
 QUERY_LOGGING=false
 INSTALL_WEB_SERVER=false
 INSTALL_WEB_INTERFACE=false
@@ -234,23 +236,29 @@ CONDITIONAL_FORWARDING=false
 EOF
 
 curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
+}
 
+
+
+piholeSet(){
 systemctl mask --now dhcpcd
 systemctl mask --now lighttpd
 systemctl daemon-reload >/dev/null 2>&1
 
-sed -i '/PIHOLE_DNS/d'  /etc/pihole/setupVars.conf
-sed -i '/QUERY_LOGGING=/i\PIHOLE_DNS_1=1.1.1.1' /etc/pihole/setupVars.conf
-sed -i '/QUERY_LOGGING=/i\PIHOLE_DNS_2=1.0.0.1' /etc/pihole/setupVars.conf
-sed -i '/QUERY_LOGGING=/i\PIHOLE_DNS_3=8.8.8.8' /etc/pihole/setupVars.conf
-sed -i '/QUERY_LOGGING=/i\PIHOLE_DNS_4=8.8.4.4' /etc/pihole/setupVars.conf
-sed -i '/server=/d'  /etc/dnsmasq.d/01-pihole.conf
-sed -i '/interface=/i\server=1.1.1.1' /etc/dnsmasq.d/01-pihole.conf
-sed -i '/interface=/i\server=1.0.0.1' /etc/dnsmasq.d/01-pihole.conf
-sed -i '/interface=/i\server=8.8.8.8' /etc/dnsmasq.d/01-pihole.conf
-sed -i '/interface=/i\server=8.8.4.4' /etc/dnsmasq.d/01-pihole.conf
+cat << EOF > /etc/pihole/pihole-FTL.conf
+PRIVACYLEVEL=0
+AAAA_QUERY_ANALYSIS=no
+EOF
 
-pihole restartdns
+pihole logging off
+
+rm -rf /etc/resolv.conf
+echo "" > /etc/resolvconf/run/interface/original.resolvconf
+echo "" > /etc/resolvconf/resolv.conf.d/original
+echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
+echo ""  > /etc/resolvconf/resolv.conf.d/tail
+ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
+resolvconf -u
 }
 
 
@@ -842,6 +850,8 @@ installIptablesRules
 
 installPihole
 
+piholeSet
+
 sed -i "/static ip_address=/d" /etc/dhcpcd.conf
 sed -i "/static routers=/d" /etc/dhcpcd.conf
 sed -i "/static domain_name_servers=/d" /etc/dhcpcd.conf
@@ -1118,9 +1128,24 @@ updatePihole(){
 ethernetnum=$(ip --oneline link show up | grep -v "lo" | awk '{print$2;exit}' | cut -d':' -f1 | cut -d'@' -f1)
 localaddr=$(ip a | grep "$ethernetnum" | awk '{print $2}' | awk 'END {print}' | cut -d'/' -f1)
 
-rm -rf /etc/.pihole /etc/pihole /opt/pihole /usr/bin/pihole-FTL /usr/local/bin/pihole /var/www/html/pihole /var/www/html/admin
+rm -rf /etc/resolv.conf
+cat << EOF > /etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+nameserver 1.0.0.1
+nameserver 8.8.4.4
+EOF
+
+date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
+hwclock -w
+
+rm -rf /etc/dnsmasq* /etc/.pihole /etc/pihole /opt/pihole /usr/bin/pihole-FTL /usr/local/bin/pihole /var/www/html/pihole /var/www/html/admin
+
+systemctl daemon-reload
 
 installPihole
+
+piholeSet
 
 blue "---------------------"
 blue "Update Pi-hole [done]"
@@ -1146,6 +1171,8 @@ source /etc/profile
 preInstall
 
 installIptablesRules
+
+piholeSet
 
 installDOHser
 
