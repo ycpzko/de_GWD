@@ -106,7 +106,8 @@
         <div class="input-group-prepend w-25">
           <span class="input-group-text justify-content-center w-100">Wan IP</span>
         </div>
-          <span class="form-control text-center"><?php echo shell_exec("curl http://members.3322.org/dyndns/getip"); ?></span>
+          <span class="form-control text-center" id="wanIP"></span>
+          <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" onclick="showIP()">查询</button>
       </div>
       
         <div class="card mb-3">
@@ -401,12 +402,17 @@ function logout(){
 $.get('auth.php', {logout:'true'}, function(result){ window.location.href="index.php" });
 }
 
+function showIP(){
+$.get('checkDDNSip.php', function(data) { $('#wanIP').text(data) });
+}
+
 function ddnsSaveCF(){
 cfdomain=$('#CFdomain').val();
 cfzoneid=$('#CFzoneid').val();
 cfapikey=$('#CFapikey').val();
 cfemail=$('#CFemail').val();
 $.get('ddnsSaveCF.php', {CFdomain:cfdomain, CFzoneid:cfzoneid, CFapikey:cfapikey, CFemail:cfemail}, function(result){ location.reload() });
+alert("正在开启DDNS，请等待");
 }
 
 function ddnsStopCF(){
@@ -421,6 +427,7 @@ function WGon(){
 WGaddress=$('#WGaddress').val();
 WGaddressport=$('#WGaddressport').val();
 $.get('WGon.php', {WGaddress:WGaddress, WGaddressport:WGaddressport}, function(result){ location.reload() });
+alert("正在开启WireGuard，请等待");
 }
 
 function WGoff(){
