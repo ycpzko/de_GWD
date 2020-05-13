@@ -111,7 +111,6 @@ net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_fastopen_blackhole_timeout_sec = 0
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_tw_recycle = 0
 net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_fin_timeout = 15
 net.ipv4.tcp_orphan_retries = 3
@@ -348,14 +347,13 @@ cat << EOF > /usr/local/bin/v2dns/config.json
   {
   "tag":"dnsin",
   "port":53,
-  "listen":"0.0.0.0",
   "protocol":"dokodemo-door",
-  "settings":{"auth":"noauth","address":"0.0.0.0","port":53,"network":"tcp,udp","followRedirect":false}
+  "settings":{"address":"1.1.1.1","port":53,"network":"tcp,udp"}
   }
 ],
 "outbounds":[
   {"tag":"direct","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}},
-  {"tag":"dnsout","protocol":"dns"}
+  {"tag":"dnsout","protocol":"dns","streamSettings":{"sockopt":{"mark":255}}}
 ],
 "routing": {
   "rules": [
@@ -372,7 +370,7 @@ cat << EOF > /usr/local/bin/vtrui/config.json
     "port":9896,
     "listen":"127.0.0.1",
     "protocol":"dokodemo-door",
-    "settings":{"auth":"noauth","network":"tcp,udp","followRedirect":true},
+    "settings":{"network":"tcp,udp","followRedirect":true},
     "streamSettings":{"sockopt":{"tproxy":"tproxy"}}
   }
 ],
@@ -680,7 +678,7 @@ apt update && apt upgrade && apt autoremove && apt autoclean
 sed -i "/www-data/d" /etc/sudoers
 sed -i "/Allow members of group sudo to execute any command/a\www-data ALL=(root)  NOPASSWD:ALL" /etc/sudoers
 
-apt install docker-ce docker-ce-cli containerd.io php7.4-fpm php7.4-common php7.4-cgi php7.4-opcache php7.4-json php7.4-sqlite3 sqlite3
+apt install docker-ce docker-ce-cli containerd.io php7.4-fpm php7.4-common php7.4-cgi php7.4-opcache php7.4-json php7.4-sqlite3 sqlite3 resolvconf
 
 sed -i "/LimitNOFILE=/c\LimitNOFILE=1000000"  /lib/systemd/system/docker.service
 sed -i "/LimitNPROC=/c\LimitNPROC=1000000"  /lib/systemd/system/docker.service
@@ -796,10 +794,12 @@ systemctl mask --now dhcpcd >/dev/null 2>&1
 systemctl daemon-reload >/dev/null 2>&1
 
 rm -rf /etc/resolv.conf
-cat << EOF > /etc/resolv.conf
-nameserver 127.0.0.1
-option use-vc
-EOF
+rm -rf /run/resolvconf/interface
+echo "" > /etc/resolvconf/resolv.conf.d/original
+echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
+echo "option use-vc" > /etc/resolvconf/resolv.conf.d/tail
+ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
+resolvconf -u
 
 cat << EOF > /etc/dnsmasq.conf
 conf-dir=/etc/dnsmasq.d
@@ -1060,7 +1060,7 @@ EOF
 chmod +x /usr/local/bin/Q4H
 /usr/local/bin/Q4H
 
-output=""
+
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
 output=`/usr/local/bin/ui-saveNode >/dev/null 2>&1`
 output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
@@ -1169,6 +1169,7 @@ sed -i '1,/BEGIN/d' ~/china.html
 sed -i '/END/,$d' ~/china.html
 sed -i 's/<br>//g' ~/china.html
 mv -f ~/china.html /usr/local/bin/chnroute.txt
+
 {
 echo "create chnroute hash:net family inet hashsize 2048 maxelem 65535"
 chnroute=`cat /usr/local/bin/chnroute.txt`
@@ -1295,7 +1296,7 @@ installPihole
 
 piholeSet
 
-output=""
+
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
 output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
 if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
