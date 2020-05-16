@@ -338,7 +338,6 @@ rm -rf /usr/local/bin/vtrui
 rm -rf /etc/vtrui
 mkdir -p /usr/local/bin/v2dns
 mkdir -p /usr/local/bin/vtrui
-mkdir -p /etc/vtrui
 if [[ $architecture = "arm64" ]]; then
     wget --no-check-certificate -O ~/vtrui.zip $mirrorSite/vtarm64.zip
 elif [[ $architecture = "amd64" ]]; then
@@ -380,6 +379,9 @@ cat << EOF > /usr/local/bin/v2dns/config.json
 }
 }
 EOF
+
+jq --arg key "$doh1Domain" --arg value "$doh1IP" '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json |\
+jq --arg key "$doh2Domain" --arg value "$doh2IP" '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
 
 cat << EOF > /usr/local/bin/vtrui/config.json
 {
@@ -425,14 +427,11 @@ cat << EOF > /usr/local/bin/vtrui/config.json
 }
 EOF
 
-jq --arg key $doh1Domain --arg value $doh1IP '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json |\
-jq --arg key $doh2Domain --arg value $doh2IP '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
-
-jq --arg domain $domain '.outbounds[0].settings.vnext[0].address=$domain' /usr/local/bin/vtrui/config.json |\
-jq --argjson port $port '.outbounds[0].settings.vnext[0].port=$port' |\
-jq --arg uuidnum $uuidnum '.outbounds[0].settings.vnext[0].users[0].id=$uuidnum' |\
-jq --arg v2path $v2path '.outbounds[0].streamSettings.wsSettings.path=$v2path' |\
-jq --arg domain $domain '.outbounds[0].streamSettings.tlsSettings.serverName=$domain' >/tmp/vtrui_temp && mv -f /tmp/vtrui_temp /usr/local/bin/vtrui/config.json
+jq --arg domain "$domain" '.outbounds[0].settings.vnext[0].address=$domain' /usr/local/bin/vtrui/config.json |\
+jq --argjson port "$port" '.outbounds[0].settings.vnext[0].port=$port' |\
+jq --arg uuidnum "$uuidnum" '.outbounds[0].settings.vnext[0].users[0].id=$uuidnum' |\
+jq --arg v2path "$v2path" '.outbounds[0].streamSettings.wsSettings.path=$v2path' |\
+jq --arg domain "$domain" '.outbounds[0].streamSettings.tlsSettings.serverName=$domain' >/tmp/vtrui_temp && mv -f /tmp/vtrui_temp /usr/local/bin/vtrui/config.json
 
 cat << "EOF" > /lib/systemd/system/v2dns.service
 [Unit]
@@ -573,14 +572,14 @@ iptables -t mangle -A V2PROXY -p tcp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5390 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5390 -j ACCEPT
+iptables -t mangle -A V2PROXY -m set --match-set hosts dst -j ACCEPT
+iptables -t mangle -A V2PROXY -m set --match-set lanip dst -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport \$(jq -r '.wireguard.WGport' /usr/local/bin/0conf) -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set listWlan src -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set listBlan src -j MARK --set-mark 0x9
 iptables -t mangle -A V2PROXY -m set --match-set listW dst -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set listB dst -j MARK --set-mark 0x9
-iptables -t mangle -A V2PROXY -m set --match-set hosts dst -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set chnroute dst -j ACCEPT
-iptables -t mangle -A V2PROXY -m set --match-set lanip dst -j ACCEPT
 iptables -t mangle -A V2PROXY -m mark --mark 0xff -j ACCEPT
 
 iptables -t mangle -A V2PROXY -p tcp -j MARK --set-mark 0x9

@@ -323,7 +323,6 @@ rm -rf /usr/local/bin/vtrui
 rm -rf /etc/vtrui
 mkdir -p /usr/local/bin/v2dns
 mkdir -p /usr/local/bin/vtrui
-mkdir -p /etc/vtrui
 wget --no-check-certificate -O ~/vtrui.zip $mirrorSite/vtamd64.zip
 mkdir -p ~/vtrui
 unzip ~/vtrui.zip -d ~/vtrui
@@ -362,6 +361,9 @@ cat << EOF > /usr/local/bin/v2dns/config.json
 }
 }
 EOF
+
+jq --arg key "$doh1Domain" --arg value "$doh1IP" '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json |\
+jq --arg key "$doh2Domain" --arg value "$doh2IP" '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
 
 cat << EOF > /usr/local/bin/vtrui/config.json
 {
@@ -407,14 +409,11 @@ cat << EOF > /usr/local/bin/vtrui/config.json
 }
 EOF
 
-jq --arg key $doh1Domain --arg value $doh1IP '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json |\
-jq --arg key $doh2Domain --arg value $doh2IP '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
-
-jq --arg domain $domain '.outbounds[0].settings.vnext[0].address=$domain' /usr/local/bin/vtrui/config.json |\
-jq --argjson port $port '.outbounds[0].settings.vnext[0].port=$port' |\
-jq --arg uuidnum $uuidnum '.outbounds[0].settings.vnext[0].users[0].id=$uuidnum' |\
-jq --arg v2path $v2path '.outbounds[0].streamSettings.wsSettings.path=$v2path' |\
-jq --arg domain $domain '.outbounds[0].streamSettings.tlsSettings.serverName=$domain' >/tmp/vtrui_temp && mv -f /tmp/vtrui_temp /usr/local/bin/vtrui/config.json
+jq --arg domain "$domain" '.outbounds[0].settings.vnext[0].address=$domain' /usr/local/bin/vtrui/config.json |\
+jq --argjson port "$port" '.outbounds[0].settings.vnext[0].port=$port' |\
+jq --arg uuidnum "$uuidnum" '.outbounds[0].settings.vnext[0].users[0].id=$uuidnum' |\
+jq --arg v2path "$v2path" '.outbounds[0].streamSettings.wsSettings.path=$v2path' |\
+jq --arg domain "$domain" '.outbounds[0].streamSettings.tlsSettings.serverName=$domain' >/tmp/vtrui_temp && mv -f /tmp/vtrui_temp /usr/local/bin/vtrui/config.json
 
 cat << "EOF" > /lib/systemd/system/v2dns.service
 [Unit]
@@ -555,14 +554,14 @@ iptables -t mangle -A V2PROXY -p tcp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5390 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5390 -j ACCEPT
+iptables -t mangle -A V2PROXY -m set --match-set hosts dst -j ACCEPT
+iptables -t mangle -A V2PROXY -m set --match-set lanip dst -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport \$(jq -r '.wireguard.WGport' /usr/local/bin/0conf) -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set listWlan src -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set listBlan src -j MARK --set-mark 0x9
 iptables -t mangle -A V2PROXY -m set --match-set listW dst -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set listB dst -j MARK --set-mark 0x9
-iptables -t mangle -A V2PROXY -m set --match-set hosts dst -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set chnroute dst -j ACCEPT
-iptables -t mangle -A V2PROXY -m set --match-set lanip dst -j ACCEPT
 iptables -t mangle -A V2PROXY -m mark --mark 0xff -j ACCEPT
 
 iptables -t mangle -A V2PROXY -p tcp -j MARK --set-mark 0x9
@@ -725,15 +724,22 @@ EOF
 
 sed -i "/engine =/c\engine = off" /etc/php/7.4/fpm/php.ini
 sed -i "/disable_functions =/c\disable_functions =" /etc/php/7.4/fpm/php.ini
-sed -i "/zend_extension=opcache.so/d" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.enable=/c\opcache.enable=1" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.enable_cli=/c\opcache.enable_cli=1" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.memory_consumption=/c\opcache.memory_consumption=128" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.interned_strings_buffer=/c\opcache.interned_strings_buffer=8" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.max_accelerated_files=/c\opcache.max_accelerated_files=200" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.revalidate_freq=/c\opcache.revalidate_freq=1" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.fast_shutdown=/c\opcache.fast_shutdown=1" /etc/php/7.4/fpm/php.ini
-sed -i "/opcache.save_comments=/c\opcache.save_comments=1" /etc/php/7.4/fpm/php.ini
+
+sed -i "s/^zend_extension/;&/" /etc/php/7.4/fpm/php.ini
+sed -i "s/^opcache/;&/" /etc/php/7.4/fpm/php.ini
+cat << EOF > /etc/php/7.4/opcache.ini
+; configuration for php opcache module
+; priority=10
+zend_extension=opcache.so
+opcache.enable=1
+opcache.enable_cli=1
+opcache.memory_consumption=128
+opcache.interned_strings_buffer=8
+opcache.max_accelerated_files=10000
+opcache.revalidate_freq=1
+opcache.fast_shutdown=1
+opcache.save_comments=1
+EOF
 
 rm -rf /lib/systemd/system/php*-fpm.service
 cat << "EOF" > /lib/systemd/system/php7.4-fpm.service
