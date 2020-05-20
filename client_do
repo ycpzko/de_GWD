@@ -71,6 +71,7 @@ cat << EOF > /etc/security/limits.conf
 EOF
 echo "ulimit -n 1000000" > ~/.bash_profile
 
+modprobe ip_conntrack
 cat << EOF > /etc/sysctl.conf
 vm.overcommit_memory = 1
 vm.swappiness = 10
@@ -171,7 +172,7 @@ hwclock -w
 
 
 installSmartDNS(){
-dpkg --purge --force-all smartdns >/dev/null 2>&1
+dpkg --purge smartdns >/dev/null 2>&1
 
 wget --no-check-certificate -O ~/smartdns.deb $smartdns_amd64
 dpkg -i ~/smartdns.deb
@@ -353,8 +354,8 @@ cat << EOF > /usr/local/bin/v2dns/config.json
   }
 ],
 "outbounds":[
-  {"tag":"direct","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}},
-  {"tag":"dnsout","protocol":"dns","streamSettings":{"sockopt":{"mark":255}}}
+  {"tag":"direct","protocol":"freedom","settings":{"domainStrategy":"UseIPv4"},"streamSettings":{"sockopt":{"mark":255}}},
+  {"tag":"dnsout","protocol":"dns"}
 ],
 "routing": {
   "rules": [
@@ -366,6 +367,31 @@ EOF
 
 jq --arg key "$doh1Domain" --arg value "$doh1IP" '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json |\
 jq --arg key "$doh2Domain" --arg value "$doh2IP" '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
+
+cat << "EOF" > /lib/systemd/system/v2dns.service
+[Unit]
+Description=v2dns Service
+After=network.target nss-lookup.target
+Wants=network-online.target
+
+[Service]
+User=root
+Type=simple
+LimitNPROC=64000
+LimitNOFILE=1000000
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+ExecStart=/usr/local/bin/v2dns/v2dns -config /usr/local/bin/v2dns/config.json
+Restart=always
+RestartSec=2
+StartLimitBurst=0
+TimeoutSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable v2dns
 
 cat << EOF > /usr/local/bin/vtrui/config.json
 {
@@ -416,31 +442,6 @@ jq --argjson port "$port" '.outbounds[0].settings.vnext[0].port=$port' |\
 jq --arg uuidnum "$uuidnum" '.outbounds[0].settings.vnext[0].users[0].id=$uuidnum' |\
 jq --arg v2path "$v2path" '.outbounds[0].streamSettings.wsSettings.path=$v2path' |\
 jq --arg domain "$domain" '.outbounds[0].streamSettings.tlsSettings.serverName=$domain' >/tmp/vtrui_temp && mv -f /tmp/vtrui_temp /usr/local/bin/vtrui/config.json
-
-cat << "EOF" > /lib/systemd/system/v2dns.service
-[Unit]
-Description=v2dns Service
-After=network.target nss-lookup.target
-Wants=network-online.target
-
-[Service]
-User=root
-Type=simple
-LimitNPROC=64000
-LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
-ExecStart=/usr/local/bin/v2dns/v2dns -config /usr/local/bin/v2dns/config.json
-Restart=always
-RestartSec=2
-StartLimitBurst=0
-TimeoutSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable v2dns
 
 cat << "EOF" > /lib/systemd/system/vtrui.service
 [Unit]
@@ -1070,10 +1071,13 @@ chmod +x /usr/local/bin/Q4H
 /usr/local/bin/Q4H
 
 
+output=`/usr/local/bin/ui-saveDNSChina >/dev/null 2>&1`
+systemctl restart smartdns
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
-if [[ $(jq -r '.splitDNS' /usr/local/bin/0conf) = "gfw" ]]; then
+output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
+if [[ $(jq -r '.dns.DNSsplit' /usr/local/bin/0conf) = "gfw" ]]; then
   output=`/usr/local/bin/ui-changeNLgfw`
-elif [[ $(jq -r '.splitDNS' /usr/local/bin/0conf) = "chnw" ]]; then
+else
   output=`/usr/local/bin/ui-changeNLchnw`
 fi
 output=`/usr/local/bin/ui-updateGen >/dev/null 2>&1`
@@ -1213,21 +1217,19 @@ installNginxDo
 
 echo "{}" > /usr/local/bin/0conf
 jq '.address={}' /usr/local/bin/0conf |\
-jq '.address.alias=""' |\
+jq '.dns={}' |\
+jq '.dns.hosts={}' |\
+jq '.v2node=[]' |\
+jq '.divertLan=[]' |\
+jq '.v2nodeForUpdate={}' |\
 jq --arg localIP "$localaddr" '.address.localIP=$localIP' |\
 jq --arg upstreamIP "$gatewayaddr" '.address.upstreamIP=$upstreamIP' |\
-jq '.address.dhcp=""' |\
-jq '.doh={}' |\
-jq --arg doh1 "$doh1" '.doh.doh1=$doh1' |\
-jq --arg doh2 "$doh2" '.doh.doh2=$doh2' |\
-jq '.v2ad=""' |\
-jq '.v2node=[]' |\
+jq --arg doh1 "$doh1" '.dns.doh1=$doh1' |\
+jq --arg doh2 "$doh2" '.dns.doh2=$doh2' |\
 jq --arg domain "$v2servn" '.v2node[0].domain=$domain' |\
 jq --arg name "$v2servn" '.v2node[0].name=$name' |\
 jq --arg uuid "$uuidnum" '.v2node[0].uuid=$uuid' |\
 jq --arg path "$v2path" '.v2node[0].path=$path' |\
-jq '.splitDNS="chnw"' |\
-jq '.v2nodeForUpdate={}' |\
 jq --arg domain "$domain" '.v2nodeForUpdate.address=$domain' |\
 jq --arg port "$port" '.v2nodeForUpdate.port=$port' |\
 jq --arg uuidnum "$uuidnum" '.v2nodeForUpdate.uuid=$uuidnum' |\
@@ -1250,7 +1252,7 @@ sudo pihole -a -p
 
 piholePW=$(awk '/WEBPASSWORD/' /etc/pihole/setupVars.conf | cut -d= -f2)
 
-jq --arg piholePW "$piholePW" '.pihole = $piholePW' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
+jq --arg piholePW "$piholePW" '.address.pihole = $piholePW' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 chmod -R 666 /usr/local/bin/0conf
 blue "------------------------------"
 blue "Change Pi-hole password [done]"
@@ -1284,7 +1286,7 @@ blue "------------------------"
 
 
 updatePihole(){
-piholePW=$(jq -r '.pihole' /usr/local/bin/0conf)
+piholePW=$(jq -r '.address.pihole' /usr/local/bin/0conf)
 
 ethernetnum=$(ip --oneline link show up | grep -v "lo" | awk '{print$2;exit}' | cut -d':' -f1 | cut -d'@' -f1)
 localaddr=$(ip a | grep "$ethernetnum" | awk '{print $2}' | awk 'END {print}' | cut -d'/' -f1)
@@ -1326,13 +1328,34 @@ blue "----------------------"
 
 
 updateGWD(){
+if [[ $(jq -r '.dns.doh1' /usr/local/bin/0conf) = "null" ]]; then
+doh1=$(jq -r '.doh.doh1' /usr/local/bin/0conf)
+doh2=$(jq -r '.doh.doh2' /usr/local/bin/0conf)
+hosts=$(jq -r '.hosts' /usr/local/bin/0conf)
+v2ad=$(jq -r '.v2ad' /usr/local/bin/0conf)
+DNSsplit=$(jq -r '.splitDNS' /usr/local/bin/0conf)
+piholePW=$(jq -r '.pihole' /usr/local/bin/0conf)
+
+jq 'del(.doh)' /usr/local/bin/0conf |\
+jq 'del(.hosts)' |\
+jq 'del(.v2ad)' |\
+jq 'del(.splitDNS)' |\
+jq 'del(.pihole)' |\
+jq --arg piholePW "$piholePW" '.address.piholePW=$piholePW' |\
+jq --arg doh1 "$doh1" '.dns.doh1=$doh1' |\
+jq --arg doh2 "$doh2" '.dns.doh2=$doh2' |\
+jq --argjson hosts "$hosts" '.dns.hosts=$hosts' |\
+jq --arg v2ad "$v2ad" '.dns.v2ad=$v2ad' |\
+jq --arg DNSsplit "$DNSsplit" '.dns.DNSsplit=$DNSsplit' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
+fi
+
 cd ~
 source /etc/profile
 
-piholePW=$(jq -r '.pihole' /usr/local/bin/0conf)
+piholePW=$(jq -r '.address.pihole' /usr/local/bin/0conf)
 
-doh1=$(jq -r '.doh.doh1' /usr/local/bin/0conf)
-doh2=$(jq -r '.doh.doh2' /usr/local/bin/0conf)
+doh1=$(jq -r '.dns.doh1' /usr/local/bin/0conf)
+doh2=$(jq -r '.dns.doh2' /usr/local/bin/0conf)
 
 domain=$(jq -r '.v2nodeForUpdate.address' /usr/local/bin/0conf)
 port=$(jq -r '.v2nodeForUpdate.port' /usr/local/bin/0conf)
