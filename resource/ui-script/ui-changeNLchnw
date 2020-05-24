@@ -50,6 +50,9 @@ sed -i "$(sed -ne '/url =/=' /etc/dns-over-https/doh-client.conf | awk NR==2)s?.
 jq --arg key1 "$doh1Domain" --arg value1 "$doh1IP" '.dns.hosts += {($key1): ($value1)}' /usr/local/bin/v2dns/config.json |\
 jq --arg key2 "$doh2Domain" --arg value2 "$doh2IP" '.dns.hosts += {($key2): ($value2)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
 
+echo $doh1IP >/usr/local/bin/IPdoh
+echo $doh2IP >>/usr/local/bin/IPdoh
+
 
 
 if [[ $(jq -r '.dns.hosts' /usr/local/bin/0conf) = "null" ]]; then
@@ -76,6 +79,7 @@ fi
 
 jq -r '.listB | keys[]' /usr/local/bin/0conf >/tmp/listB 2>/dev/null
 if [[ -n $(cat /tmp/listB)  ]]; then
+  jq '.dns.servers[1].domains=[]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
   cat /tmp/listB | while read line 
   do
   jq --arg listB "keyword:$line" '.dns.servers[1].domains+=[$listB]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
@@ -83,6 +87,7 @@ if [[ -n $(cat /tmp/listB)  ]]; then
 fi
 
 jq -r '.listW | keys[]' /usr/local/bin/0conf >/tmp/listW 2>/dev/null
+jq '.dns.servers[2].domains=[]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
 cat /tmp/listW | while read line 
 do
 jq --arg listW "keyword:$line" '.dns.servers[2].domains+=[$listW]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
