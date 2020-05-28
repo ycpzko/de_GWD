@@ -81,7 +81,7 @@ echo "ulimit -n 1000000" > ~/.bash_profile
 modprobe ip_conntrack
 cat << EOF > /etc/sysctl.conf
 vm.overcommit_memory = 1
-vm.swappiness = 10
+vm.swappiness = 0
 fs.file-max = 1000000
 fs.inotify.max_user_instances = 1000000
 fs.inotify.max_user_watches = 1000000
@@ -192,7 +192,6 @@ rm -rf ~/smartdns.deb
 rm -rf /etc/smartdns/*.conf
 cat << EOF > /etc/smartdns/smartdns.conf
 bind [::]:5310
-bind-tcp [::]:5310
 
 speed-check-mode  ping,tcp:80
 cache-size        10000
@@ -368,12 +367,12 @@ cat << EOF > /usr/local/bin/v2dns/config.json
   "tag":"dnsin",
   "port":53,
   "protocol":"dokodemo-door",
-  "settings":{"address":"1.1.1.1","port":53,"network":"tcp,udp"}
+  "settings":{"network":"udp","address":"1.1.1.1","port":53}
   }
 ],
 "outbounds":[
   {"tag":"direct","protocol":"freedom","settings":{},"streamSettings":{"sockopt":{"mark":255}}},
-  {"tag":"dnsout","protocol":"dns"}
+  {"tag":"dnsout","protocol":"dns","settings":{"network":"udp"}}
 ],
 "routing": {
   "rules": [
@@ -573,7 +572,6 @@ iptables -A INPUT -p tcp --dport 5390 -i $ethernetnum -j DROP
 iptables -A INPUT -p udp --dport 5390 -i $ethernetnum -j DROP
 
 iptables -t mangle -N V2PROXY
-iptables -t mangle -A V2PROXY -p tcp --dport 53 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 53 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5310 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5310 -j ACCEPT
@@ -661,7 +659,6 @@ cat << EOF > /etc/resolv.conf
 nameserver 127.0.0.1
 nameserver 1.1.1.1
 nameserver 8.8.8.8
-option use-vc
 EOF
 
 (curl -Is  google.com | head -n 1) >/dev/null 2>&1
@@ -733,7 +730,7 @@ rm -rf /etc/resolv.conf
 rm -rf /run/resolvconf/interface
 cat /dev/null > /etc/resolvconf/resolv.conf.d/original
 echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "option use-vc" > /etc/resolvconf/resolv.conf.d/tail
+echo "" > /etc/resolvconf/resolv.conf.d/tail
 ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
 resolvconf -u
 
@@ -1098,7 +1095,6 @@ cat << EOF > /etc/resolv.conf
 nameserver 127.0.0.1
 nameserver 1.1.1.1
 nameserver 8.8.8.8
-option use-vc
 EOF
 
 jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
@@ -1114,6 +1110,13 @@ piholeSet
 
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
 output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
+
+if [[ $(jq -r '.dns.DNSsplit' /usr/local/bin/0conf) = "gfw" ]]; then
+  output=`/usr/local/bin/ui-changeNLgfw`
+else
+  output=`/usr/local/bin/ui-changeNLchnw`
+fi
+
 if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
 output=`/usr/local/bin/ui-dhcpUP`
 fi
