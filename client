@@ -359,6 +359,7 @@ rm -rf ~/vtrui*
 cat << EOF > /usr/local/bin/v2dns/config.json
 {
 "dns":{
+  "tag": "dnsFlow",
   "hosts":{"localhost":"127.0.0.1"},
   "servers":[{"address":"127.0.0.1","port":5380}]
 },
@@ -376,7 +377,8 @@ cat << EOF > /usr/local/bin/v2dns/config.json
 ],
 "routing": {
   "rules": [
-    {"type":"field","inboundTag":"dnsin","outboundTag":"dnsout"}
+    {"type":"field","inboundTag":"dnsin","outboundTag":"dnsout"},
+    {"type":"field","inboundTag":"dnsFlow","outboundTag":"direct"}
   ]
 }
 }
@@ -396,7 +398,7 @@ User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
 ExecStart=/usr/local/bin/v2dns/v2dns -config /usr/local/bin/v2dns/config.json
 Restart=always
 RestartSec=2
