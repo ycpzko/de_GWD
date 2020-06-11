@@ -186,13 +186,12 @@ location ~ /\.(?!well-known).* {
   deny all;
 }
   
-location ~* \.php$ {
-  fastcgi_pass            unix:/run/php/php-fpm.sock;
-  fastcgi_index           index.php;
-  fastcgi_split_path_info ^(.+\.php)(.*)$;
-  include                 fastcgi_params;
-  fastcgi_param           SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-}
+location ~ [^/]\.php(/|$) {
+          fastcgi_pass unix:/run/php/php-fpm.sock;
+          fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+          fastcgi_index index.php;
+          include fastcgi_params;
+        }
 
 location /dq {
   proxy_pass                http://127.0.0.1:8053/dq;
@@ -376,7 +375,13 @@ rm -rf /var/log/*1*
 rm -rf /var/log/*2*
 rm -rf /var/log/*.gz
 rm -rf /tmp/nodecheck*
+rm -rf /var/www/html/log.log
 rm -rf /var/www/html/gwd/log.log
+
+if [[ -f "/lib/modules/$(uname -r | awk NR==1)/extra/wireguard.ko" ]]; then
+cd /lib/modules/
+rm -rf $(ls | grep -v $(uname -r | awk NR==1))
+fi
 
 rm -rf /usr/local/bin/chnrouteset
 EOF
@@ -412,7 +417,7 @@ cat << "EOF" > /usr/local/bin/Q2H
 date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
 hwclock -w
 
-output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
+/usr/local/bin/ui-saveListBW >/dev/null 2>&1
 EOF
 chmod +x /usr/local/bin/Q2H
 
@@ -550,11 +555,10 @@ echo '@reboot ~/bbrkernel/clearkernel' >> ~/now.cron
 crontab ~/now.cron
 rm -rf ~/now.cron
 
+reboot
 blue "-----------------------"
 blue  "Install bbrplus [done]"
 blue "-----------------------"
-
-reboot
 }
 
 
@@ -638,6 +642,7 @@ if [[ ! -f "/etc/wireguard/wg0.conf" ]]; then
 mkdir -p /etc/wireguard
 output=`/usr/local/bin/ui-WGchangeKey >/dev/null 2>&1`
 fi
+
 blue "------------------------"
 blue "Install WireGuard [done]"
 blue "------------------------"
