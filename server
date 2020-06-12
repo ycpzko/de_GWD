@@ -10,8 +10,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 
 preInstall(){
-checkSWAP=`swapon --show`
-if [[ -z "$checkSWAP" ]]; then
+if [[ $(free -m | awk 'NR==3{print$2}') = "0" ]]; then
 fallocate -l 1G /swapfile
 dd if=/dev/zero of=/swapfile bs=1k count=1024k status=progress
 chmod 600 /swapfile
@@ -20,7 +19,6 @@ swapon /swapfile
 sed -i "/swapfile/d" /etc/fstab
 echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
 echo "RESUME=" > /etc/initramfs-tools/conf.d/resume
-update-initramfs -u
 fi
 
 systemctl mask --now systemd-resolved  >/dev/null 2>&1
@@ -54,7 +52,9 @@ deb http://security.debian.org/debian-security $(cat /etc/os-release | grep VERS
 deb http://deb.debian.org/debian/ $(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)-updates main
 EOF
 
-apt update && apt install sudo locales net-tools dnsutils wget curl rsync git jq unzip netcat socat ca-certificates apt-transport-https gnupg2 haveged resolvconf
+apt update && apt upgrade && apt autoremove && apt autoclean
+
+apt install sudo locales net-tools netcat dnsutils resolvconf wget curl rsync git jq unzip ca-certificates apt-transport-https gnupg2 haveged socat
 source /etc/profile
 systemctl enable --now haveged >/dev/null 2>&1
 
@@ -104,7 +104,7 @@ net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.default.arp_ignore = 1
 net.ipv4.conf.all.rp_filter = 2
 net.ipv4.conf.default.rp_filter = 2
-net.ipv4.ip_local_port_range = 1025 65535
+net.ipv4.ip_local_port_range = 1024 65535
 net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_fastopen_blackhole_timeout_sec = 0
@@ -252,7 +252,7 @@ rm -rf /etc/resolv.conf
 rm -rf /run/resolvconf/interface
 cat /dev/null > /etc/resolvconf/resolv.conf.d/original
 echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
-echo "" > /etc/resolvconf/resolv.conf.d/tail
+cat /dev/null > /etc/resolvconf/resolv.conf.d/tail
 ln -s /etc/resolvconf/run/resolv.conf /etc/resolv.conf
 resolvconf -u
 
@@ -394,7 +394,7 @@ User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BIND_SERVICE
 ExecStart=/usr/local/bin/vtrui/vtrui -config /usr/local/bin/vtrui/config.json
 Restart=always
 RestartSec=2
@@ -711,7 +711,7 @@ location $v2path {
   proxy_pass                http://127.0.0.1:11811;
   proxy_http_version        1.1;
   proxy_set_header          Host \$http_host;
-  proxy_set_header          Upgrade WebSocket;
+  proxy_set_header          Upgrade "WebSocket";
   proxy_set_header          Connection "upgrade";
   proxy_set_header          X-Real-IP \$remote_addr;
   proxy_set_header          X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -798,8 +798,6 @@ rm -rf ~/sample*
 fi
 
 wget -O /usr/local/bin/version.php https://raw.githubusercontent.com/jacyl4/de_GWD/master/version.php
-
-apt update && apt upgrade && apt autoremove && apt autoclean
 }
 
 
@@ -1089,7 +1087,6 @@ fi
 cat >> /usr/local/bin/vtrui/config.json << EOF
   "outbounds": [
     {
-    "mux":{"enabled":true},
     "protocol":"vmess",
     "settings":{"vnext":[{
       "address":"$domain",
