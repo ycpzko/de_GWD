@@ -360,8 +360,7 @@ cat << EOF > /usr/local/bin/v2dns/config.json
   }
 ],
 "outbounds":[
-  {"tag":"direct","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}},
-  {"tag":"dnsout","protocol":"dns","settings":{"network":"tcp,udp"}}
+  {"tag":"dnsout","protocol":"dns"}
 ],
 "routing": {
   "rules": [
@@ -402,6 +401,7 @@ systemctl restart v2dns
 
 cat << EOF > /usr/local/bin/vtrui/config.json
 {
+"dns":{"servers":[{"address":"127.0.0.1","port":53}]},
 "inbounds":[
   {
     "port":9896,
@@ -561,9 +561,10 @@ iptables -A INPUT -p tcp --dport 5390 -i $ethernetnum -j DROP
 iptables -A INPUT -p udp --dport 5390 -i $ethernetnum -j DROP
 
 iptables -t mangle -N V2PROXY
-iptables -t mangle -A V2PROXY -p tcp --dport 53 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 53 -j ACCEPT
+iptables -t mangle -A V2PROXY -p tcp --dport 53 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5310 -j ACCEPT
+iptables -t mangle -A V2PROXY -p tcp --dport 5310 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5380 -j ACCEPT
 iptables -t mangle -A V2PROXY -p tcp --dport 5390 -j ACCEPT
