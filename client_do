@@ -178,6 +178,7 @@ hwclock -w
 
 
 installSmartDNS(){
+systemctl stop smartdns >/dev/null 2>&1
 dpkg --purge smartdns >/dev/null 2>&1
 
 wget --no-check-certificate -O ~/smartdns.deb $smartdns_amd64
@@ -216,13 +217,13 @@ After=network.target
 [Service]
 User=root
 Type=forking
-LimitNPROC=64000
-LimitNOFILE=1000000
 EnvironmentFile=/etc/default/smartdns
-ExecStart=/usr/sbin/smartdns $SMART_DNS_OPTS
+ExecStartPost=/bin/sh -c "echo $MAINPID > /run/smartdns.pid"
+ExecStart=/usr/sbin/smartdns -p /run/smartdns.pid $SMART_DNS_OPTS
 KillMode=mixed
 Restart=always
 RestartSec=2
+StartLimitBurst=0
 
 [Install]
 WantedBy=multi-user.target
@@ -312,6 +313,7 @@ LimitNOFILE=1000000
 ExecStart=/usr/local/bin/doh-client -conf /etc/dns-over-https/doh-client.conf
 Restart=always
 RestartSec=2
+StartLimitBurst=0
 
 [Install]
 WantedBy=multi-user.target
@@ -353,20 +355,14 @@ cat << EOF > /usr/local/bin/v2dns/config.json
 },
 "inbounds":[
   {
-  "tag":"dnsin",
   "port":53,
   "protocol":"dokodemo-door",
   "settings":{"network":"tcp,udp","address":"1.1.1.1","port":53}
   }
 ],
 "outbounds":[
-  {"tag":"dnsout","protocol":"dns"}
-],
-"routing": {
-  "rules": [
-    {"type":"field","inboundTag":["dnsin"],"outboundTag":"dnsout"}
-  ]
-}
+  {"protocol":"dns"}
+]
 }
 EOF
 
@@ -389,7 +385,6 @@ ExecStart=/usr/local/bin/v2dns/v2dns -config /usr/local/bin/v2dns/config.json
 Restart=always
 RestartSec=2
 StartLimitBurst=0
-TimeoutSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -461,12 +456,11 @@ User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
 ExecStart=/usr/local/bin/vtrui/vtrui -config /usr/local/bin/vtrui/config.json
 Restart=always
 RestartSec=2
 StartLimitBurst=0
-TimeoutSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -770,6 +764,7 @@ ExecStart=/usr/sbin/php-fpm7.4 --nodaemonize --fpm-config /etc/php/7.4/fpm/php-f
 ExecReload=/bin/kill -USR2 $MAINPID
 Restart=always
 RestartSec=2
+StartLimitBurst=0
 
 [Install]
 WantedBy=multi-user.target
@@ -1016,17 +1011,14 @@ After=network.target
 [Service]
 User=root
 Type=oneshot
-RemainAfterExit=yes
 ExecStart=/usr/local/bin/ui-update
 ExecStop=/bin/kill -9 \$MAINPID
 KillMode=process
 StartLimitBurst=0
-TimeoutSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
-
 systemctl daemon-reload >/dev/null 2>&1
 }
 
