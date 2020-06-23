@@ -31,8 +31,8 @@ doh2=$(jq -r '.dns.doh2' /usr/local/bin/0conf)
 doh1Domain=$(echo $doh1 | cut -d/ -f1 | cut -d: -f1)
 doh2Domain=$(echo $doh2 | cut -d/ -f1 | cut -d: -f1)
 
-doh1IP=$(nslookup -port=5310 $doh1Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
-doh2IP=$(nslookup -port=5310 $doh2Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
+doh1IP=$(nslookup -port=5310 $doh1Domain 127.0.0.1 | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
+doh2IP=$(nslookup -port=5310 $doh2Domain 127.0.0.1 | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
 
 doh_upstream1='url = "https:\/\/'$doh1'"'
 doh_upstream2='url = "https:\/\/'$doh2'"'
@@ -47,18 +47,27 @@ echo $doh1IP >/usr/local/bin/IPdoh
 echo $doh2IP >>/usr/local/bin/IPdoh
 
 
-if [[ $(jq -r '.dns.hosts' /usr/local/bin/0conf) = "null" ]]; then
-  jq '.dns.hosts={}' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
-else
-  jq -r '.dns.hosts | to_entries[] | [.key, .value] | @tsv' /usr/local/bin/0conf >/tmp/hosts
+cat /dev/null >/usr/local/bin/IPv2node
+jq -r '.v2node[].domain' /usr/local/bin/0conf | cut -d: -f1 >/tmp/v2node_temp2
+sort /tmp/v2node_temp2 | uniq | sed '/^\s*$/d' >/tmp/v2node_temp
+cat /tmp/v2node_temp | while read line 
+do
+  key=$line
+  value=$(nslookup -port=5390 $line 127.0.0.1 | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
+echo $value >>/usr/local/bin/IPv2node
+jq --arg key "$key" --arg value "$value" '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
+done
+
+
+jq -r '.dns.hosts | to_entries[] | [.key, .value] | @tsv' /usr/local/bin/0conf >/tmp/hosts
+if [[ -n $(cat /tmp/hosts) ]]; then
   cat /tmp/hosts | while read line 
   do
-    key=$(echo $line | awk '{print$1}')
-    value=$(echo $line | awk '{print$2}')
+    key=$(echo $line | awk '{print$2}')
+    value=$(echo $line | awk '{print$1}')
   jq --arg key "$key" --arg value "$value" '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
   done
 fi
-
 
 
 if [[ $(jq -r '.dns.v2ad' /usr/local/bin/0conf) == "on" ]]; then
@@ -69,27 +78,34 @@ fi
 
 
 
-jq -r '.listB | keys[]' /usr/local/bin/0conf >/tmp/listB 2>/dev/null
-if [[ -n $(cat /tmp/listB)  ]]; then
-  jq '.dns.servers[1].domains=[]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
-  cat /tmp/listB | while read line 
-  do
-  jq --arg listB "keyword:$line" '.dns.servers[1].domains+=[$listB]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
-  done
+if [[ -n $(awk '/listB/ {print;exit}' /usr/local/bin/0conf) ]]; then
+  jq -r '.listB | keys[]' /usr/local/bin/0conf >/tmp/listB
+  if [[ -n $(cat /tmp/listB)  ]]; then
+    jq '.dns.servers[1].domains=[]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
+    cat /tmp/listB | while read line 
+    do
+    jq --arg listB "keyword:$line" '.dns.servers[1].domains+=[$listB]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
+    done
+  fi
 fi
 
-jq -r '.listW | keys[]' /usr/local/bin/0conf >/tmp/listW 2>/dev/null
-jq '.dns.servers[2].domains=[]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
-cat /tmp/listW | while read line 
-do
-jq --arg listW "keyword:$line" '.dns.servers[2].domains+=[$listW]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
-done
+if [[ -n $(awk '/listW/ {print;exit}' /usr/local/bin/0conf) ]]; then
+  jq -r '.listW | keys[]' /usr/local/bin/0conf >/tmp/listW
+  if [[ -n $(cat /tmp/listW)  ]]; then
+    jq '.dns.servers[2].domains=[]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
+    cat /tmp/listW | while read line 
+    do
+    jq --arg listW "keyword:$line" '.dns.servers[2].domains+=[$listW]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
+    done
+  fi
+fi
 
 
 
 jq --arg DNSsplit "gfw" '.dns.DNSsplit=$DNSsplit' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 
 rm -rf /tmp/v2dns_temp*
+rm -rf /tmp/v2node_temp*
 rm -rf /tmp/hosts
 rm -rf /tmp/listB
 rm -rf /tmp/listW

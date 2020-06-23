@@ -137,10 +137,10 @@ sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
 sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf
 
 if [[ "$(uname -r)" =~ "bbrplus" ]]; then
-echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
+echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control = bbrplus" >> /etc/sysctl.conf
 else
-echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
+echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
 fi
 sysctl -p
@@ -240,7 +240,6 @@ doh1Domain=$(echo $doh1 | cut -d/ -f1 | cut -d: -f1)
 doh2Domain=$(echo $doh2 | cut -d/ -f1 | cut -d: -f1)
 doh1IP=$(nslookup $doh1Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
 doh2IP=$(nslookup $doh2Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
-domainIP=$(nslookup $domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
 
 wget --no-check-certificate -O ~/doh.zip $mirrorSite/dohamd64.zip
 unzip ~/doh.zip -d ~/
@@ -362,8 +361,10 @@ cat << EOF > /usr/local/bin/v2dns/config.json
 }
 EOF
 
+domainIP=$(nslookup -port=5380 $domain 127.0.0.1 | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
 jq --arg key "$doh1Domain" --arg value "$doh1IP" '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json |\
-jq --arg key "$doh2Domain" --arg value "$doh2IP" '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
+jq --arg key "$doh2Domain" --arg value "$doh2IP" '.dns.hosts += {($key): ($value)}' |\
+jq --arg key "$domain" --arg value "$domainIP" '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
 
 cat << "EOF" > /lib/systemd/system/v2dns.service
 [Unit]
@@ -471,6 +472,7 @@ rm -rf /usr/bin/vtrui
 
 installIptablesProxy(){
 touch /usr/local/bin/IPdoh
+touch /usr/local/bin/IPv2node
 touch /usr/local/bin/IPlistB
 touch /usr/local/bin/IPlistW
 touch /usr/local/bin/IPlistBlan
@@ -478,13 +480,14 @@ touch /usr/local/bin/IPlistWlan
 
 echo $doh1IP > /usr/local/bin/IPdoh
 echo $doh2IP >> /usr/local/bin/IPdoh
-echo $domainIP > /usr/local/bin/IPlistW
+echo $domainIP > /usr/local/bin/IPv2node
 
 cat << EOF > /usr/local/bin/iptables-proxy-up
 #!/bin/bash
 ipset -X chnroute
 ipset -X lanip
 ipset -X doh
+ipset -X v2node
 ipset -X listB
 ipset -X listW
 ipset -X listBlan
@@ -505,7 +508,7 @@ lanip="0.0.0.0/8 \
 223.5.5.5/32 \
 223.6.6.6/32"
 
-ipset -R < /usr/local/bin/IPchnroute
+ipset -R < /usr/local/bin/chnrouteSET
 
 ipset -N lanip hash:net family inet hashsize 2048 maxelem 65535
 for iplanip in \$lanip; do
@@ -513,8 +516,13 @@ for iplanip in \$lanip; do
 done
 
 ipset -N doh hash:net family inet hashsize 2048 maxelem 65535
-for ipdoh in \$(cat /usr/local/bin/IPdoh); do
-  ipset add doh \$ipdoh
+for IPdoh in \$(cat /usr/local/bin/IPdoh); do
+  ipset add doh \$IPdoh
+done
+
+ipset -N v2node hash:net family inet hashsize 2048 maxelem 65535
+for IPv2node in \$(cat /usr/local/bin/IPv2node); do
+  ipset add v2node \$IPv2node
 done
 
 ipset -N listB hash:net family inet hashsize 2048 maxelem 65535
@@ -560,6 +568,7 @@ iptables -t mangle -A V2PROXY -p tcp --dport 5390 -j ACCEPT
 iptables -t mangle -A V2PROXY -p udp --dport 5390 -j ACCEPT
 
 iptables -t mangle -A V2PROXY -m set --match-set doh dst -j ACCEPT
+iptables -t mangle -A V2PROXY -m set --match-set v2node dst -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set listBlan src -j MARK --set-mark 0x9
 iptables -t mangle -A V2PROXY -m set --match-set listWlan src -j ACCEPT
 iptables -t mangle -A V2PROXY -m set --match-set lanip dst -j ACCEPT
@@ -596,6 +605,7 @@ iptables -X
 ipset -F chnroute
 ipset -F lanip
 ipset -F doh
+ipset -F v2node
 ipset -F listB
 ipset -F listW
 ipset -F listBlan
@@ -688,9 +698,6 @@ cat << EOF > /etc/php/7.4/fpm/php-fpm.conf
 pid = /run/php/php-fpm.pid
 error_log = /var/log/php-fpm.log
 
-emergency_restart_threshold = 10
-emergency_restart_interval = 1m
-
 include=/etc/php/7.4/fpm/pool.d/*.conf
 EOF
 
@@ -708,7 +715,7 @@ pm.max_children = 50
 pm.start_servers = 12
 pm.min_spare_servers = 12
 pm.max_spare_servers = 24
-pm.max_requests = 500
+pm.max_requests = 1000
 
 catch_workers_output = yes
 clear_env = no
@@ -972,6 +979,7 @@ jacyl4/nginx_tls1.3:latest
 
 installWebUI(){
 rm -rf /usr/local/bin/ui-*
+rm -rf /usr/local/bin/ui_*
 rm -rf /var/www/html/*.php
 rm -rf /var/www/html/vendor
 rm -rf /var/www/html/css
@@ -983,6 +991,7 @@ svn export --force https://github.com/jacyl4/de_GWD/branches/$branch/resource/ui
 rsync -azrI ~/ui-script/* /usr/local/bin
 rsync -azrI ~/ui-web/* /var/www/html
 rm -rf ~/ui-*
+rm -rf ~/ui_*
 
 wget --no-check-certificate -c https://raw.githubusercontent.com/jacyl4/de_GWD/$branch/version.php
 mv -f ~/version.php /var/www/html/version.php
@@ -1020,68 +1029,14 @@ systemctl daemon-reload >/dev/null 2>&1
 
 
 postInstall(){
-cat << "EOF" > /usr/local/bin/Q4am
-#!/bin/bash
-cd ~
-wget --no-check-certificate -c https://raw.githubusercontent.com/v2ray/domain-list-community/release/dlc.dat
-if [ $(ls -l ~/dlc.dat | awk '{print$5}') -gt 240000 ]; then
-mv -f ~/dlc.dat /usr/local/bin/v2dns/geosite.dat
-fi
-
-wget --no-check-certificate -c https://raw.githubusercontent.com/ToutyRater/V2Ray-SiteDAT/master/geofiles/h2y.dat
-if [ $(ls -l ~/h2y.dat | awk '{print$5}') -gt 240000 ]; then
-mv -f ~/h2y.dat /usr/local/bin/v2dns/h2y.dat
-fi
-
-wget --no-check-certificate -c https://bgp.space/china.html
-if [ $(ls -l ~/china.html | awk '{print$5}') -gt 50000 ]; then
-sed -i '1,/BEGIN/d' ~/china.html
-sed -i '/END/,$d' ~/china.html
-sed -i 's/<br>//g' ~/china.html
-mv -f ~/china.html /usr/local/bin/chnroute.txt
-cp -f /usr/local/bin/chnroute.txt /usr/local/bin/IPchnroute
-sed -i 's/^/add chnroute &/g' /usr/local/bin/IPchnroute
-sed -i '1i\create chnroute hash:net family inet hashsize 2048 maxelem 65535' /usr/local/bin/IPchnroute
-
-ipset -F chnroute
-for ipchnroute in $(cat /usr/local/bin/chnroute.txt); do
-  ipset add chnroute $ipchnroute >/dev/null 2>&1
-done
-fi
-EOF
-chmod +x /usr/local/bin/Q4am
-/usr/local/bin/Q4am
-
-cat << "EOF" > /usr/local/bin/Q4H
-#!/bin/bash
-rm -rf ~/client*
-rm -rf /var/log/*1*
-rm -rf /var/log/*2*
-rm -rf /var/log/*.gz
-rm -rf /tmp/nodecheck*
-rm -rf /var/www/html/log.log
-
-if [[ -f "/lib/modules/$(uname -r | awk NR==1)/extra/wireguard.ko" ]]; then
-cd /lib/modules/
-rm -rf $(ls | grep -v $(uname -r | awk NR==1))
-fi
-
-rm -rf /usr/local/bin/chnrouteset
-EOF
-chmod +x /usr/local/bin/Q4H
-/usr/local/bin/Q4H
-
+/usr/local/bin/ui_am4
+/usr/local/bin/ui_4h
+/usr/local/bin/ui_2h
 
 output=`/usr/local/bin/ui-saveDNSChina >/dev/null 2>&1`
-output=`systemctl restart smartdns >/dev/null 2>&1`
+output=`systemctl restart smartdns`
+sleep 3
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
-output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
-if [[ $(jq -r '.dns.DNSsplit' /usr/local/bin/0conf) = "gfw" ]]; then
-  output=`/usr/local/bin/ui-changeNLgfw`
-else
-  output=`/usr/local/bin/ui-changeNLchnw`
-fi
-output=`/usr/local/bin/ui-updateGen >/dev/null 2>&1`
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
   output=`/usr/local/bin/ui-markThis >/dev/null 2>&1`
 fi
@@ -1093,25 +1048,19 @@ fi
 output=`systemctl restart v2dns`
 output=`systemctl restart vtrui`
 output=`systemctl restart iptables-proxy`
-
-
-cat << "EOF" > /usr/local/bin/Q2H
-#!/bin/bash
-date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
-hwclock -w
-
-/usr/local/bin/ui-saveListBW >/dev/null 2>&1
-EOF
-chmod +x /usr/local/bin/Q2H
+output=`/usr/local/bin/ui-updateGen >/dev/null 2>&1`
 
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4am/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4H/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q2H/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_am4/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_4h/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_2h/d' ~/now.cron
 cat << EOF >> ~/now.cron
-0 4 * * * /usr/local/bin/Q4am
-0 */4 * * * /usr/local/bin/Q4H
-0 */2 * * * /usr/local/bin/Q2H
+0 4 * * * /usr/local/bin/ui_am4
+0 */4 * * * /usr/local/bin/ui_4h
+0 */2 * * * /usr/local/bin/ui_2h
 EOF
 crontab ~/now.cron
 rm -rf ~/now.cron
@@ -1191,10 +1140,10 @@ wget --no-check-certificate -c https://bgp.space/china.html
 sed -i '1,/BEGIN/d' ~/china.html
 sed -i '/END/,$d' ~/china.html
 sed -i 's/<br>//g' ~/china.html
-mv -f ~/china.html /usr/local/bin/chnroute.txt
-cp -f /usr/local/bin/chnroute.txt /usr/local/bin/IPchnroute
-sed -i 's/^/add chnroute &/g' /usr/local/bin/IPchnroute
-sed -i '1i\create chnroute hash:net family inet hashsize 2048 maxelem 65535' /usr/local/bin/IPchnroute
+mv -f ~/china.html /usr/local/bin/IPchnroute
+cp -f /usr/local/bin/IPchnroute /usr/local/bin/chnrouteSET
+sed -i 's/^/add chnroute &/g' /usr/local/bin/chnrouteSET
+sed -i '1i\create chnroute hash:net family inet hashsize 2048 maxelem 65535' /usr/local/bin/chnrouteSET
 
 installIptablesProxy
 
@@ -1356,6 +1305,11 @@ jq --argjson hosts "$hosts" '.dns.hosts=$hosts' |\
 jq --arg v2ad "$v2ad" '.dns.v2ad=$v2ad' |\
 jq --arg DNSsplit "$DNSsplit" '.dns.DNSsplit=$DNSsplit' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 fi
+rm -rf /usr/local/bin/chnroute.txt
+rm -rf /usr/local/bin/Q4am
+rm -rf /usr/local/bin/Q4H
+rm -rf /usr/local/bin/Q2H
+
 
 cd ~
 source /etc/profile

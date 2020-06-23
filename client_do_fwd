@@ -237,6 +237,7 @@ jacyl4/nginx_tls1.3:latest
 
 clifwd_installWebUI(){
 rm -rf /usr/local/bin/ui-*
+rm -rf /usr/local/bin/ui_*
 rm -rf /var/www/html/gwd/*.php
 rm -rf /var/www/html/gwd/vendor
 rm -rf /var/www/html/gwd/css
@@ -267,6 +268,7 @@ done
 rsync -azrI ~/ui-script/* /usr/local/bin
 rsync -azrI ~/ui-web/* /var/www/html/gwd
 rm -rf ~/ui-*
+rm -rf ~/ui_*
 
 cat << "EOF" >/tmp/vtruiConfADD
 clifwd_v2path=$(jq -r '.clifwd.clifwd_v2path' /usr/local/bin/0conf)
@@ -335,70 +337,14 @@ systemctl daemon-reload >/dev/null 2>&1
 
 
 clifwd_PostInstall(){
-cat << "EOF" > /usr/local/bin/Q4am
-#!/bin/bash
-cd ~
-wget --no-check-certificate -c https://raw.githubusercontent.com/v2ray/domain-list-community/release/dlc.dat
-if [ $(ls -l ~/dlc.dat | awk '{print$5}') -gt 240000 ]; then
-mv -f ~/dlc.dat /usr/local/bin/v2dns/geosite.dat
-fi
-
-wget --no-check-certificate -c https://raw.githubusercontent.com/ToutyRater/V2Ray-SiteDAT/master/geofiles/h2y.dat
-if [ $(ls -l ~/h2y.dat | awk '{print$5}') -gt 240000 ]; then
-mv -f ~/h2y.dat /usr/local/bin/v2dns/h2y.dat
-fi
-
-wget --no-check-certificate -c https://bgp.space/china.html
-if [ $(ls -l ~/china.html | awk '{print$5}') -gt 50000 ]; then
-sed -i '1,/BEGIN/d' ~/china.html
-sed -i '/END/,$d' ~/china.html
-sed -i 's/<br>//g' ~/china.html
-mv -f ~/china.html /usr/local/bin/chnroute.txt
-cp -f /usr/local/bin/chnroute.txt /usr/local/bin/IPchnroute
-sed -i 's/^/add chnroute &/g' /usr/local/bin/IPchnroute
-sed -i '1i\create chnroute hash:net family inet hashsize 2048 maxelem 65535' /usr/local/bin/IPchnroute
-
-ipset -F chnroute
-for ipchnroute in $(cat /usr/local/bin/chnroute.txt); do
-  ipset add chnroute $ipchnroute >/dev/null 2>&1
-done
-fi
-EOF
-chmod +x /usr/local/bin/Q4am
-/usr/local/bin/Q4am
-
-cat << "EOF" > /usr/local/bin/Q4H
-#!/bin/bash
-rm -rf ~/client*
-rm -rf ~/clifwd*
-rm -rf /var/log/*1*
-rm -rf /var/log/*2*
-rm -rf /var/log/*.gz
-rm -rf /tmp/nodecheck*
-rm -rf /var/www/html/log.log
-rm -rf /var/www/html/gwd/log.log
-
-if [[ -f "/lib/modules/$(uname -r | awk NR==1)/extra/wireguard.ko" ]]; then
-cd /lib/modules/
-rm -rf $(ls | grep -v $(uname -r | awk NR==1))
-fi
-
-rm -rf /usr/local/bin/chnrouteset
-EOF
-chmod +x /usr/local/bin/Q4H
-/usr/local/bin/Q4H
-
+/usr/local/bin/ui_am4
+/usr/local/bin/ui_4h
+/usr/local/bin/ui_2h
 
 output=`/usr/local/bin/ui-saveDNSChina >/dev/null 2>&1`
-output=`systemctl restart smartdns >/dev/null 2>&1`
+output=`systemctl restart smartdns`
+sleep 3
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
-output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
-if [[ $(jq -r '.dns.DNSsplit' /usr/local/bin/0conf) = "gfw" ]]; then
-  output=`/usr/local/bin/ui-changeNLgfw`
-else
-  output=`/usr/local/bin/ui-changeNLchnw`
-fi
-output=`/usr/local/bin/ui-updateGen >/dev/null 2>&1`
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
   output=`/usr/local/bin/ui-markThis >/dev/null 2>&1`
 fi
@@ -410,25 +356,19 @@ fi
 output=`systemctl restart v2dns`
 output=`systemctl restart vtrui`
 output=`systemctl restart iptables-proxy`
-
-
-cat << "EOF" > /usr/local/bin/Q2H
-#!/bin/bash
-date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
-hwclock -w
-
-/usr/local/bin/ui-saveListBW >/dev/null 2>&1
-EOF
-chmod +x /usr/local/bin/Q2H
+output=`/usr/local/bin/ui-updateGen >/dev/null 2>&1`
 
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4am/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4H/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q2H/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_am4/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_4h/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_2h/d' ~/now.cron
 cat << EOF >> ~/now.cron
-0 4 * * * /usr/local/bin/Q4am
-0 */4 * * * /usr/local/bin/Q4H
-0 */2 * * * /usr/local/bin/Q2H
+0 4 * * * /usr/local/bin/ui_am4
+0 */4 * * * /usr/local/bin/ui_4h
+0 */2 * * * /usr/local/bin/ui_2h
 EOF
 crontab ~/now.cron
 rm -rf ~/now.cron
@@ -535,7 +475,7 @@ PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
 sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
 sed -i "/net.ipv4.tcp_congestion_control/d" /etc/sysctl.conf
-echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
+echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control = bbrplus" >> /etc/sysctl.conf
 sysctl -p
 
@@ -724,6 +664,10 @@ jq --argjson hosts "$hosts" '.dns.hosts=$hosts' |\
 jq --arg v2ad "$v2ad" '.dns.v2ad=$v2ad' |\
 jq --arg DNSsplit "$DNSsplit" '.dns.DNSsplit=$DNSsplit' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 fi
+rm -rf /usr/local/bin/chnroute.txt
+rm -rf /usr/local/bin/Q4am
+rm -rf /usr/local/bin/Q4H
+rm -rf /usr/local/bin/Q2H
 
 cd ~
 source /etc/profile
