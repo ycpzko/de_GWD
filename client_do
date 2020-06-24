@@ -392,7 +392,7 @@ systemctl restart v2dns
 
 cat << EOF > /usr/local/bin/vtrui/config.json
 {
-"dns":{"servers":[{"address":"127.0.0.1","port":53}]},
+"dns":{"servers":["localhost"]},
 "inbounds":[
   {
     "port":9896,
@@ -515,32 +515,32 @@ for iplanip in \$lanip; do
   ipset add lanip \$iplanip
 done
 
-ipset -N doh hash:net family inet hashsize 2048 maxelem 65535
+ipset -N doh hash:ip family inet
 for IPdoh in \$(cat /usr/local/bin/IPdoh); do
   ipset add doh \$IPdoh
 done
 
-ipset -N v2node hash:net family inet hashsize 2048 maxelem 65535
+ipset -N v2node hash:ip family inet
 for IPv2node in \$(cat /usr/local/bin/IPv2node); do
   ipset add v2node \$IPv2node
 done
 
-ipset -N listB hash:net family inet hashsize 2048 maxelem 65535
+ipset -N listB hash:ip family inet
 for iplistB in \$(cat /usr/local/bin/IPlistB); do
   ipset add listB \$iplistB
 done
 
-ipset -N listW hash:net family inet hashsize 2048 maxelem 65535
+ipset -N listW hash:ip family inet
 for iplistW in \$(cat /usr/local/bin/IPlistW); do
   ipset add listW \$iplistW
 done
 
-ipset -N listBlan hash:net family inet hashsize 2048 maxelem 65535
+ipset -N listBlan hash:net family inet
 for iplistBlan in \$(cat /usr/local/bin/IPlistBlan); do
   ipset add listBlan \$iplistBlan
 done
 
-ipset -N listWlan hash:net family inet hashsize 2048 maxelem 65535
+ipset -N listWlan hash:net family inet
 for iplistWlan in \$(cat /usr/local/bin/IPlistWlan); do
   ipset add listWlan \$iplistWlan
 done
@@ -685,7 +685,7 @@ apt update && apt upgrade && apt autoremove && apt autoclean
 sed -i "/www-data/d" /etc/sudoers
 sed -i "/Allow members of group sudo to execute any command/a\www-data ALL=(root)  NOPASSWD:ALL" /etc/sudoers
 
-apt install docker-ce docker-ce-cli containerd.io php7.4-fpm php7.4-common php7.4-cgi php7.4-opcache php7.4-json php7.4-sqlite3 sqlite3 resolvconf
+apt install docker-ce docker-ce-cli containerd.io php7.4-fpm php7.4-common php7.4-cgi php7.4-xml php7.4-opcache php7.4-json php7.4-sqlite3 php-intl sqlite3 resolvconf
 
 sed -i "/LimitNOFILE=/c\LimitNOFILE=1000000"  /lib/systemd/system/docker.service
 sed -i "/LimitNPROC=/c\LimitNPROC=1000000"  /lib/systemd/system/docker.service
@@ -1305,6 +1305,7 @@ jq --argjson hosts "$hosts" '.dns.hosts=$hosts' |\
 jq --arg v2ad "$v2ad" '.dns.v2ad=$v2ad' |\
 jq --arg DNSsplit "$DNSsplit" '.dns.DNSsplit=$DNSsplit' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 fi
+rm -rf /usr/local/bin/chnrouteset
 rm -rf /usr/local/bin/chnroute.txt
 rm -rf /usr/local/bin/Q4am
 rm -rf /usr/local/bin/Q4H
