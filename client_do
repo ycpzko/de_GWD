@@ -350,14 +350,23 @@ cat << EOF > /usr/local/bin/v2dns/config.json
 },
 "inbounds":[
   {
-  "port":53,
-  "protocol":"dokodemo-door",
-  "settings":{"network":"tcp,udp","address":"1.1.1.1","port":53}
+    "tag": "dnsin",
+    "port":53,
+    "protocol":"dokodemo-door",
+    "settings":{"network":"tcp,udp","address":"1.1.1.1","port":53}
   }
 ],
 "outbounds":[
-  {"protocol":"dns"}
-]
+  {
+    "tag": "dnsout",
+    "protocol":"dns"
+  }
+],
+"routing":{
+  "rules":[
+    {"type":"field","inboundTag":["dnsin"],"outboundTag":"dnsout"}
+  ]
+}
 }
 EOF
 
@@ -637,8 +646,6 @@ systemctl enable iptables-proxy
 rm -rf /etc/resolv.conf
 cat << EOF > /etc/resolv.conf
 nameserver 127.0.0.1
-nameserver 1.1.1.1
-nameserver 8.8.8.8
 EOF
 
 output=`systemctl restart iptables-proxy`
@@ -688,7 +695,7 @@ sed -i "/Allow members of group sudo to execute any command/a\www-data ALL=(root
 apt install docker-ce docker-ce-cli containerd.io php7.4-fpm php7.4-common php7.4-cgi php7.4-xml php7.4-opcache php7.4-json php7.4-sqlite3 php-intl sqlite3 resolvconf
 
 sed -i "/LimitNOFILE=/c\LimitNOFILE=1000000"  /lib/systemd/system/docker.service
-sed -i "/LimitNPROC=/c\LimitNPROC=1000000"  /lib/systemd/system/docker.service
+sed -i "/LimitNPROC=/c\LimitNPROC=64000"  /lib/systemd/system/docker.service
 systemctl daemon-reload >/dev/null 2>&1
 systemctl enable docker
 systemctl restart docker
@@ -1247,8 +1254,6 @@ rm -rf /etc/.pihole /etc/pihole /opt/pihole /usr/bin/pihole-FTL /usr/local/bin/p
 rm -rf /etc/resolv.conf
 cat << EOF > /etc/resolv.conf
 nameserver 127.0.0.1
-nameserver 1.1.1.1
-nameserver 8.8.8.8
 EOF
 
 jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
