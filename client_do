@@ -238,8 +238,8 @@ rm -rf /usr/local/bin/doh-client
 
 doh1Domain=$(echo $doh1 | cut -d/ -f1 | cut -d: -f1)
 doh2Domain=$(echo $doh2 | cut -d/ -f1 | cut -d: -f1)
-doh1IP=$(nslookup $doh1Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
-doh2IP=$(nslookup $doh2Domain | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
+doh1IP=$(nslookup $doh1Domain | awk '/Address/ {print$2}' | sed '1d' | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
+doh2IP=$(nslookup $doh2Domain | awk '/Address/ {print$2}' | sed '1d' | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
 
 wget --no-check-certificate -O ~/doh.zip $mirrorSite/dohamd64.zip
 unzip ~/doh.zip -d ~/
@@ -370,7 +370,7 @@ cat << EOF > /usr/local/bin/v2dns/config.json
 }
 EOF
 
-domainIP=$(nslookup -port=5380 $domain 127.0.0.1 | awk '/Address/ {print$2}' | sed '1d' | sed '/[a-z]/d')
+domainIP=$(nslookup -port=5380 $domain 127.0.0.1 | awk '/Address/ {print$2}' | sed '1d' | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
 jq --arg key "$doh1Domain" --arg value "$doh1IP" '.dns.hosts += {($key): ($value)}' /usr/local/bin/v2dns/config.json |\
 jq --arg key "$doh2Domain" --arg value "$doh2IP" '.dns.hosts += {($key): ($value)}' |\
 jq --arg key "$domain" --arg value "$domainIP" '.dns.hosts += {($key): ($value)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
@@ -524,35 +524,47 @@ for iplanip in \$lanip; do
   ipset add lanip \$iplanip
 done
 
-ipset -N doh hash:ip family inet
-for IPdoh in \$(cat /usr/local/bin/IPdoh); do
-  ipset add doh \$IPdoh
-done
+if [[ -n \$(cat /usr/local/bin/IPdoh) ]]; then
+  ipset -N doh hash:ip family inet
+  for IPdoh in \$(cat /usr/local/bin/IPdoh); do
+    ipset add doh \$IPdoh
+  done
+fi
 
-ipset -N v2node hash:ip family inet
-for IPv2node in \$(cat /usr/local/bin/IPv2node); do
-  ipset add v2node \$IPv2node
-done
+if [[ -n \$(cat /usr/local/bin/IPv2node) ]]; then
+  ipset -N v2node hash:ip family inet
+  for IPv2node in \$(cat /usr/local/bin/IPv2node); do
+    ipset add v2node \$IPv2node
+  done
+fi
 
-ipset -N listB hash:ip family inet
-for iplistB in \$(cat /usr/local/bin/IPlistB); do
-  ipset add listB \$iplistB
-done
+if [[ -n \$(cat /usr/local/bin/IPlistB) ]]; then
+  ipset -N listB hash:ip family inet
+  for iplistB in \$(cat /usr/local/bin/IPlistB); do
+    ipset add listB \$iplistB
+  done
+fi
 
-ipset -N listW hash:ip family inet
-for iplistW in \$(cat /usr/local/bin/IPlistW); do
-  ipset add listW \$iplistW
-done
+if [[ -n \$(cat /usr/local/bin/IPlistW) ]]; then
+  ipset -N listW hash:ip family inet
+  for iplistW in \$(cat /usr/local/bin/IPlistW); do
+    ipset add listW \$iplistW
+  done
+fi
 
-ipset -N listBlan hash:net family inet
-for iplistBlan in \$(cat /usr/local/bin/IPlistBlan); do
-  ipset add listBlan \$iplistBlan
-done
+if [[ -n \$(cat /usr/local/bin/IPlistBlan) ]]; then
+  ipset -N listBlan hash:net family inet
+  for iplistBlan in \$(cat /usr/local/bin/IPlistBlan); do
+    ipset add listBlan \$iplistBlan
+  done
+fi
 
-ipset -N listWlan hash:net family inet
-for iplistWlan in \$(cat /usr/local/bin/IPlistWlan); do
-  ipset add listWlan \$iplistWlan
-done
+if [[ -n \$(cat /usr/local/bin/IPlistWlan) ]]; then
+  ipset -N listWlan hash:net family inet
+  for iplistWlan in \$(cat /usr/local/bin/IPlistWlan); do
+    ipset add listWlan \$iplistWlan
+  done
+fi
 
 ip rule add fwmark 0x9 table 100 pref 100
 ip route add local 0.0.0.0/0 dev lo table 100
@@ -1041,7 +1053,7 @@ postInstall(){
 /usr/local/bin/ui_2h
 
 output=`/usr/local/bin/ui-saveDNSChina >/dev/null 2>&1`
-output=`systemctl restart smartdns`
+systemctl restart smartdns
 sleep 3
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
@@ -1266,15 +1278,15 @@ installPihole
 
 piholeSet
 
-
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
-output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
 
 if [[ $(jq -r '.dns.DNSsplit' /usr/local/bin/0conf) = "gfw" ]]; then
   output=`/usr/local/bin/ui-changeNLgfw`
 else
   output=`/usr/local/bin/ui-changeNLchnw`
 fi
+
+output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
 
 if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
 output=`/usr/local/bin/ui-dhcpUP`

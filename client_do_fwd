@@ -342,7 +342,7 @@ clifwd_PostInstall(){
 /usr/local/bin/ui_2h
 
 output=`/usr/local/bin/ui-saveDNSChina >/dev/null 2>&1`
-output=`systemctl restart smartdns`
+systemctl restart smartdns
 sleep 3
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
@@ -619,14 +619,16 @@ installPihole
 
 piholeSet
 
-
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
-output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
+
 if [[ $(jq -r '.dns.DNSsplit' /usr/local/bin/0conf) = "gfw" ]]; then
   output=`/usr/local/bin/ui-changeNLgfw`
 else
   output=`/usr/local/bin/ui-changeNLchnw`
 fi
+
+output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
+
 output=`systemctl restart v2dns`
 output=`systemctl restart vtrui`
 output=`systemctl restart iptables-proxy`
