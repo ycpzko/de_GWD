@@ -232,10 +232,10 @@
 <span class="float-right">
 <div class="input-group mt-1 mr-4 mb-4">
   <div class="input-group-prepend">
-  <label class="input-group-text">UDP代理<span class="badge badge-pill badge-success my-auto ml-1"><?php echo shell_exec('sudo /usr/local/bin/ui-checkUDP');?></span></label>
+  <label class="input-group-text">UDP代理</label>
   </div>
   <div class="input-group-append">
-    <button class="btn btn-secondary" type="button" onclick="udpON()">开启</button>
+    <button class="btn btn-<?php echo shell_exec('sudo /usr/local/bin/ui-checkUDP');?>" type="button" onclick="udpON()">开启</button>
     <button class="btn btn-secondary" type="button" onclick="udpOFF()">关闭</button>
   </div>
 </div>
@@ -326,7 +326,7 @@
                 </tbody>
               </table>
 
-<div id="shnodedt" style="display:none">
+<div id="shnodedt" style="display:<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->divertLan->display; ?>">
 <span class="float-left">
 <div class="input-group ml-4 mt-1 mb-1">
   <div class="input-group-prepend">
@@ -352,7 +352,7 @@
 <span class="float-right">
 <div class="input-group mt-1 mr-4">
   <div class="input-group-prepend">
-  <input id="nodedttext" type="text" class="form-control" placeholder="内网设备IP 空格分隔" value="<?php foreach (json_decode(file_get_contents('/usr/local/bin/0conf'), true)['divertLan'] as $k => $v) {echo "$v ";} ?>">
+  <input id="nodedttext" type="text" class="form-control" placeholder="内网设备IP 空格分隔" value="<?php foreach (json_decode(file_get_contents('/usr/local/bin/0conf'), true)['divertLan']['ip'] as $k => $v) {echo "$v ";} ?>">
   </div>
   <div class="input-group-append">
     <button class="btn btn-secondary" type="button" onclick="submitlocalip()">IP写入</button>
@@ -375,7 +375,7 @@
           <span class="float-right mt-n1 mb-n2">
                 <button type="button" class="btn btn-outline-secondary btn-sm mt-1" style="border-radius: 0px;" onclick="changeNLchnw()">大陆白名单</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm mt-1" style="border-radius: 0px;" onclick="changeNLgfw()">GFWlist</button>
-                <button type="button" class="btn btn-outline-dark btn-sm mt-1" style="border-radius: 0px;" onclick="submitDNS()">提交</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm mt-1" style="border-radius: 0px;" onclick="submitDNS()">提交</button>
           </span>
           </div>
 
@@ -385,11 +385,11 @@
 
               <div class="input-group mt-1 mb-4 ml-4">
                 <div class="input-group-prepend">
-                <label class="input-group-text">V2去广告<span class="badge badge-pill badge-success my-auto ml-1"><?php echo shell_exec('sudo /usr/local/bin/ui-checkV2ad');?></span></label>
+                <label class="input-group-text">V2去广告</label>
                 </div>
                 <div class="input-group-append">
-                  <button class="btn btn-outline-secondary" type="button" onclick="v2adADD()">开启</button>
-                  <button class="btn btn-outline-secondary" type="button" onclick="v2adDEL()">关闭</button>
+                  <button class="btn btn-<?php echo shell_exec('sudo /usr/local/bin/ui-checkV2ad');?>" type="button" onclick="v2adADD()">开启</button>
+                  <button class="btn btn-secondary" type="button" onclick="v2adDEL()">关闭</button>
                 </div>
               </div>
 
@@ -487,10 +487,9 @@
           <div class="card-header">
             <i class="fas fa-network-wired"></i>
             DHCP 服务
-          <span class="badge badge-pill badge-success my-auto ml-1"><?php echo shell_exec('sudo /usr/local/bin/ui-checkDhcp');?></span>
 <span class="float-right mt-n1 mb-n2">
-<a href="/admin/settings.php?tab=piholedhcp" class="btn btn-outline-secondary btn-sm mt-1" style="border-radius: 0px;">详情</a>
-<button type="button" class="btn btn-outline-dark btn-sm mt-1" style="border-radius: 0px;" onclick="dhcpUP()">开启</button>
+<a href="/admin/settings.php?tab=piholedhcp" class="btn btn-outline-dark btn-sm mt-1" style="border-radius: 0px;">详情</a>
+<button type="button" class="btn btn-<?php echo shell_exec('sudo /usr/local/bin/ui-checkDhcp');?> btn-sm mt-1" style="border-radius: 0px;" onclick="dhcpUP()">开启</button>
 <button type="button" class="btn btn-outline-dark btn-sm mt-1" style="border-radius: 0px;" onclick="dhcpDOWN()">关闭</button>
 </span>
           </div>
@@ -572,9 +571,11 @@ $.get('markThis.php', {markName:markNametxt}, function(result){window.location.r
 }
 
 function NodeDTshow(){
+$("#shnodedt").css("display", "block");
 $.get('switchNodeDT.php', {switchNodeDT:"NodeDTshow"}, function(result){window.location.reload();});
 }
 function NodeDThide(){
+$("#shnodedt").css("display", "none");
 $.get('switchNodeDT.php', {switchNodeDT:"NodeDThide"}, function(result){window.location.reload();});
 }
 

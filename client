@@ -82,22 +82,26 @@ EOF
 echo "ulimit -n 1000000" > ~/.bash_profile
 
 modprobe ip_conntrack
+
 cat << EOF > /etc/sysctl.conf
 vm.overcommit_memory = 1
-vm.swappiness = 0
-fs.file-max = 1000000
-fs.inotify.max_user_instances = 1000000
-fs.inotify.max_user_watches = 1000000
-net.core.netdev_max_backlog = 32768
-net.core.optmem_max = 8388608
-net.core.rmem_max = 8388608
-net.core.rmem_default = 8388608
-net.core.wmem_max = 8388608
-net.core.wmem_default = 8388608
-net.core.somaxconn = 32768
-net.netfilter.nf_conntrack_checksum = 0
-net.netfilter.nf_conntrack_max = 1000000
+vm.swappiness = 2
+net.unix.max_dgram_qlen = 1024
 net.nf_conntrack_max = 1000000
+net.netfilter.nf_conntrack_max = 1000000
+net.netfilter.nf_conntrack_checksum = 0
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 5
+fs.file-max = 1000000
+fs.inotify.max_user_instances = 819200
+fs.inotify.max_queued_events = 32000
+fs.inotify.max_user_watches = 64000
+net.core.netdev_max_backlog = 250000
+net.core.optmem_max = 4194304
+net.core.rmem_max = 4194304
+net.core.rmem_default = 4194304
+net.core.wmem_max = 4194304
+net.core.wmem_default = 4194304
+net.core.somaxconn = 256000
 net.ipv4.icmp_echo_ignore_broadcasts = 1
 net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv6.conf.all.disable_ipv6 = 1
@@ -105,8 +109,8 @@ net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.default.arp_ignore = 1
-net.ipv4.conf.all.rp_filter = 2
-net.ipv4.conf.default.rp_filter = 2
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
 net.ipv4.conf.all.send_redirects = 1
 net.ipv4.conf.default.send_redirects = 1
 net.ipv4.conf.all.accept_redirects = 1
@@ -119,24 +123,31 @@ net.ipv4.ip_forward = 1
 net.ipv4.ip_local_port_range = 1024 65535
 net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_fastopen_blackhole_timeout_sec = 0
-net.ipv4.tcp_timestamps = 1
-net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_timestamps = 0
+net.ipv4.tcp_tw_reuse = 0
 net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_fin_timeout = 15
-net.ipv4.tcp_orphan_retries = 3
-net.ipv4.tcp_syn_retries = 3
-net.ipv4.tcp_synack_retries = 3
+net.ipv4.tcp_fin_timeout = 10
+net.ipv4.tcp_orphan_retries = 2
+net.ipv4.tcp_syn_retries = 2
+net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_sack = 1
+net.ipv4.tcp_mtu_probing = 0
 net.ipv4.tcp_max_syn_backlog = 32768
 net.ipv4.tcp_max_tw_buckets = 6000
 net.ipv4.tcp_max_orphans = 32768
-net.ipv4.tcp_rmem = 4096 87380 8388608
-net.ipv4.tcp_wmem = 4096 87380 8388608
+net.ipv4.tcp_rmem = 4096 87380 4194304
+net.ipv4.tcp_wmem = 4096 65536 4194304
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 net.ipv4.tcp_keepalive_time = 1800
 net.ipv4.tcp_keepalive_intvl = 15
-net.ipv4.tcp_keepalive_probes = 3
+net.ipv4.tcp_keepalive_probes = 5
 net.ipv4.tcp_rfc1337 = 1
+net.ipv4.tcp_low_latency = 1
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.neigh.default.gc_thresh1 = 1024
+net.ipv4.neigh.default.gc_thresh2 = 2048
+net.ipv4.neigh.default.gc_thresh3 = 4096
 EOF
 
 sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
@@ -194,8 +205,8 @@ rm -rf ~/smartdns.deb
 
 rm -rf /etc/smartdns/*.conf
 cat << EOF > /etc/smartdns/smartdns.conf
-bind [::]:5310
-bind-tcp [::]:5310
+bind :5310
+bind-tcp :5310
 
 speed-check-mode  ping,tcp:80
 cache-size        10000
@@ -243,7 +254,7 @@ systemctl restart smartdns
 
 
 installDOH(){
-systemctl disable --now doh-client >/dev/null 2>&1
+systemctl stop doh-client >/dev/null 2>&1
 rm -rf /usr/local/bin/doh-client
 
 doh1Domain=$(echo $doh1 | cut -d/ -f1 | cut -d: -f1)
@@ -282,7 +293,7 @@ upstream_selector = "weighted_round_robin"
 timeout = 30
 no_cookies = true
 no_ecs = true
-no_ipv6 = true
+no_ipv6 = false
 verbose = false
 EOF
 
@@ -778,20 +789,23 @@ pihole restartdns
 
 
 installWebUI(){
+cd ~
+svn export --force https://github.com/jacyl4/de_GWD/branches/$branch/resource/ui-script
+svn export --force https://github.com/jacyl4/de_GWD/branches/$branch/resource/ui-web
+
+if [[ -f ~/ui-script/ui_am4 ]] && [[ -d ~/ui-web/vendor/jquery ]]; then
 rm -rf /usr/local/bin/ui-*
 rm -rf /usr/local/bin/ui_*
 rm -rf /var/www/html/*.php
 rm -rf /var/www/html/vendor
 rm -rf /var/www/html/css
 rm -rf /var/www/html/js
-cd ~
-svn export --force https://github.com/jacyl4/de_GWD/branches/$branch/resource/ui-script
-svn export --force https://github.com/jacyl4/de_GWD/branches/$branch/resource/ui-web
 
 rsync -azrI ~/ui-script/* /usr/local/bin
 rsync -azrI ~/ui-web/* /var/www/html
-rm -rf ~/ui-*
-rm -rf ~/ui_*
+rm -rf ~/ui-script
+rm -rf ~/ui-web
+fi
 
 wget --no-check-certificate -c https://raw.githubusercontent.com/jacyl4/de_GWD/$branch/version.php
 mv -f ~/version.php /var/www/html/version.php
@@ -835,9 +849,6 @@ postInstall(){
 
 output=`/usr/local/bin/ui-saveDNSChina >/dev/null 2>&1`
 output=`/usr/local/bin/ui-NodeDThide >/dev/null 2>&1`
-if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
-  output=`/usr/local/bin/ui-markThis >/dev/null 2>&1`
-fi
 if [[ $(jq -r '.address.udp' /usr/local/bin/0conf) = "on" ]]; then
   output=`/usr/local/bin/ui-udpON >/dev/null 2>&1`
 else
@@ -847,10 +858,14 @@ output=`systemctl restart smartdns`
 output=`systemctl restart v2dns`
 output=`systemctl restart vtrui`
 output=`systemctl restart iptables-proxy`
+
+if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
+  output=`/usr/local/bin/ui-markThis >/dev/null 2>&1`
+fi
 output=`/usr/local/bin/ui-updateGen >/dev/null 2>&1`
 
-/usr/local/bin/ui_4h
-/usr/local/bin/ui_2h
+output=`/usr/local/bin/ui_4h`
+output=`/usr/local/bin/ui_2h`
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4am/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4H/d' ~/now.cron
@@ -967,7 +982,8 @@ jq '.address={}' /usr/local/bin/0conf |\
 jq '.dns={}' |\
 jq '.dns.hosts={}' |\
 jq '.v2node=[]' |\
-jq '.divertLan=[]' |\
+jq '.divertLan.display="none"' |\
+jq '.divertLan.ip=[]' |\
 jq '.v2nodeForUpdate={}' |\
 jq --arg localIP "$localaddr" '.address.localIP=$localIP' |\
 jq --arg upstreamIP "$gatewayaddr" '.address.upstreamIP=$upstreamIP' |\
@@ -1106,11 +1122,18 @@ jq --argjson hosts "$hosts" '.dns.hosts=$hosts' |\
 jq --arg v2ad "$v2ad" '.dns.v2ad=$v2ad' |\
 jq --arg DNSsplit "$DNSsplit" '.dns.DNSsplit=$DNSsplit' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 fi
+
+if [[ $(awk '/divertLan/ {print;exit}' /usr/local/bin/0conf) =~ "[" ]]; then
+jq '.divertLan={}' /usr/local/bin/0conf |\
+jq '.divertLan.display="none"' |\
+jq '.divertLan.ip=[]' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
+fi
 rm -rf /usr/local/bin/chnrouteset
 rm -rf /usr/local/bin/chnroute.txt
 rm -rf /usr/local/bin/Q4am
 rm -rf /usr/local/bin/Q4H
 rm -rf /usr/local/bin/Q2H
+rm -rf /etc/modules-load.d/nf_conntrack.conf
 
 cd ~
 source /etc/profile
