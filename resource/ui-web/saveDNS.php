@@ -36,17 +36,17 @@ file_put_contents('/usr/local/bin/0conf', $newJsonString);
 
 exec('sudo /usr/local/bin/ui-saveDNSChina');
 exec('sudo systemctl restart smartdns');
+exec('sudo systemctl restart doh-client');
 
 $data = json_decode(file_get_contents('/usr/local/bin/0conf'), true);
 if ( $data['DNSsplit'] === "gfw" ){
-	exec('sudo /usr/local/bin/ui-changeNLgfw');
+	exec('sudo /usr/local/bin/ui-dnsGFW');
 } else {
-	exec('sudo /usr/local/bin/ui-changeNLchnw');
+	exec('sudo /usr/local/bin/ui-dnsCHNW');
 }
 
 exec('sudo /usr/local/bin/ui-saveListBW');
-exec('sudo systemctl restart v2dns');
-exec('sudo systemctl restart doh-client');
 exec('sudo systemctl restart iptables-proxy');
+exec('sudo systemctl restart v2dns');
 ?>
 <?php }?>
