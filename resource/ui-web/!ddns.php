@@ -12,7 +12,7 @@
   <meta name="description" content="">
   <meta name="author" content="">
 
-  <title>DDNS & WireGuard</title>
+  <title>DDNS & LINK</title>
 
   <!-- Custom fonts for this template-->
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
@@ -64,7 +64,7 @@
       <li class="nav-item active">
         <a class="nav-link" href="!ddns.php">
           <i class="fas fa-fw fa-ethernet"></i>
-          <span>DDNS & WireGuard</span></a>
+          <span>DDNS & LINK</span></a>
       </li>
       <li class="nav-item">
         <a class="nav-link" href="!nodeMAN.php">
@@ -160,16 +160,18 @@
           <div class="card-header">
             <i class="fas fa-bacon"></i>
             FRP
-<span class="float-right mt-n1 mb-n2">
-<button type="button" class="btn btn-outline-dark btn-sm mt-1 mr-5" style="border-Radius: 0px;" onclick="installFRP()">install</button>
-<button type="button" class="btn btn-<?php echo shell_exec('sudo /usr/local/bin/ui-checkFRP');?> btn-sm mt-1" style="border-Radius: 0px;" onclick="onFRP()">开启</button>
+<span class="float-right mt-n1 mb-n2 ml-4" id="FRPbutton" style="display:none">
+<button type="button" class="btn btn-<?php echo shell_exec('sudo /usr/local/bin/ui-checkFRP'); ?> btn-sm mt-1" style="border-Radius: 0px;" onclick="onFRP()">开启</button>
 <button type="button" class="btn btn-outline-dark btn-sm mt-1" style="border-Radius: 0px;" onclick="offFRP()">关闭</button>
+</span>
+<span class="float-right mt-n1 mb-n2">
+<button type="button" class="btn btn-outline-dark btn-sm mt-1" style="border-Radius: 0px;" onclick="installFRP()">install</button>
 </span>
           </div>
 
-          <div class="card-body"  style="display:<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->FRP->display ?>">
+          <div class="card-body" id="FRPbody" style="display:none">
   <div class="form-row">
-      <div class="col-md-6">
+      <div class="col-md-8">
         <H6 class="my-auto mr-3">
         <i class="fas fa-globe-asia my-1 ml-4 mr-2"></i>服务端：
         </H6>
@@ -188,10 +190,17 @@
           <span class="input-group-text align-self-center">Token</span>
         </div>
           <input type="text" id="FRPtoken" class="form-control" style="max-width: 120px;" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->FRP->token ?>">
+        <div class="input-group-prepend">
+          <button id="FRPbindProtocol" class="btn btn-outline-secondary dropdown-toggle" type="button" data-toggle="dropdown"><?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->FRP->bindProtocol ?></button>
+            <div class="dropdown-menu">
+            <a class="dropdown-item" onclick="FRPbindTCP()" href="#">TCP</a>
+            <a class="dropdown-item" onclick="FRPbindKCP()" href="#">KCP</a>
+            </div>
+        </div>
       </div>
       </div>
 
-      <div class="col-md-6">
+      <div class="col-md-4">
         <H6 class="my-auto mr-3">
         <i class="fas fa-ethernet my-1 ml-4 mr-2"></i>本地端：
         </H6>
@@ -209,17 +218,17 @@
         <div class="input-group-prepend">
           <button id="FRPprotocol" class="btn btn-outline-secondary dropdown-toggle" type="button" data-toggle="dropdown"><?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->FRP->protocol ?></button>
             <div class="dropdown-menu">
-            <a class="dropdown-item" onclick="FRPprotocolSWtcp()" href="#">TCP</a>
-            <a class="dropdown-item" onclick="FRPprotocolSWudp()" href="#">UDP</a>
+            <a class="dropdown-item" onclick="FRPprotocolTCP()" href="#">TCP</a>
+            <a class="dropdown-item" onclick="FRPprotocolUDP()" href="#">UDP</a>
             </div>
-        </div>  
+        </div>
       </div>
       </div>
   </div>
 
     <div class="form-row mt-3">
       <div class="col-md-12 input-group">
-        <input class="form-control" type="text" placeholder="服务端安装指令" readonly>
+        <input class="form-control" type="text" id="frpCMD" placeholder="服务端安装指令" value="" readonly>
         <div class="input-group-append">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" onclick="genFRPcmd()">生成安装指令</button>
         </div> 
@@ -233,14 +242,15 @@
           <div class="card-header">
             <i class="fas fa-archway"></i>
             WireGuard Server
-          <span class="badge badge-pill badge-info align-center ml-1"><?php echo shell_exec('sudo /usr/local/bin/ui-checkWGkernel');?></span>
-<span class="float-right mt-n1 mb-n2">
-<button type="button" class="btn btn-outline-dark btn-sm mt-1 mr-5" style="border-Radius: 0px;" onclick="WGchangeKey()">重新生成密钥</button>
+<span class="float-right mt-n1 mb-n2 ml-4" id="WGbutton" style="display:none">
 <button type="button" class="btn btn-<?php echo shell_exec('sudo /usr/local/bin/ui-checkWG');?> btn-sm mt-1" style="border-Radius: 0px;" onclick="WGon()">开启</button>
 <button type="button" class="btn btn-outline-dark btn-sm mt-1" style="border-Radius: 0px;" onclick="WGoff()">关闭</button>
 </span>
+<span class="float-right mt-n1 mb-n2">
+<button type="button" class="btn btn-outline-dark btn-sm mt-1" style="border-Radius: 0px;" onclick="installWG()">install</button>
+</span>
           </div>
-          <div class="card-body">
+          <div class="card-body" id="WGbody" style="display:none">
 
 <div class="form-row mb-3">
       <div class="col-md-6 input-group mb-1 mx-auto">
@@ -253,6 +263,7 @@
           <span class="input-group-text justify-content-center">UDP端口</span>
           </div>
           <input type="text" id="WGaddressport" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGport ?>">
+          <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" onclick="WGchangeKey()">重新生成密钥</button>
       </div>
 </div>
 
@@ -489,24 +500,49 @@ function ddnsStopCF(){
 $.get('ddnsStopCF.php', function(result){window.location.reload();});
 }
 
-function FRPprotocolSWtcp(){$('#FRPprotocol').html("TCP"); };
-function FRPprotocolSWudp(){$('#FRPprotocol').html("UDP"); };
+function FRPbindTCP(){$('#FRPbindProtocol').html("TCP"); };
+function FRPbindKCP(){$('#FRPbindProtocol').html("KCP"); };
+
+function FRPprotocolTCP(){$('#FRPprotocol').html("TCP"); };
+function FRPprotocolUDP(){$('#FRPprotocol').html("UDP"); };
+
+function installFRP(){
+$.get('installFRPc.php', function(result){});
+window.open('http://10.0.0.2:3000', 'popupWindow', 'width=800, height=600, scrollbars=yes');
+};
 
 function onFRP(){
 FRPdomain=$('#FRPdomain').val();
 FRPbindPort=$('#FRPbindPort').val();
 FRPtoken=$('#FRPtoken').val();
+FRPbindProtocol=$('#FRPbindProtocol').html();
 FRPremotePort=$('#FRPremotePort').val();
 FRPlocalPort=$('#FRPlocalPort').val();
 FRPprotocol=$('#FRPprotocol').html();
-$.get('onFRP.php', {FRPdomain:FRPdomain, FRPbindPort:FRPbindPort, FRPtoken:FRPtoken, FRPremotePort:FRPremotePort, FRPlocalPort:FRPlocalPort, FRPprotocol:FRPprotocol}, function(result){ location.reload() });
+$.get('onFRP.php', {FRPdomain:FRPdomain, FRPbindPort:FRPbindPort, FRPtoken:FRPtoken, FRPbindProtocol:FRPbindProtocol, FRPremotePort:FRPremotePort, FRPlocalPort:FRPlocalPort, FRPprotocol:FRPprotocol}, function(result){ location.reload() });
 };
 
 function offFRP(){
 $.get('offFRP.php', function(result){window.location.reload();});
 };
 
+function genFRPcmd(){
+FRPdomain=$('#FRPdomain').val();
+FRPbindPort=$('#FRPbindPort').val();
+FRPtoken=$('#FRPtoken').val();
+FRPbindProtocol=$('#FRPbindProtocol').html();
+FRPremotePort=$('#FRPremotePort').val();
+FRPlocalPort=$('#FRPlocalPort').val();
+FRPprotocol=$('#FRPprotocol').html();
+$.get('genFRPcmd.php', {FRPdomain:FRPdomain, FRPbindPort:FRPbindPort, FRPtoken:FRPtoken, FRPbindProtocol:FRPbindProtocol, FRPremotePort:FRPremotePort, FRPlocalPort:FRPlocalPort, FRPprotocol:FRPprotocol}, function(data){
+$('#frpCMD').val(data);
+});
+};
 
+function installWG(){
+$.get('installWG.php', function(result){});
+window.open('http://10.0.0.2:3000', 'popupWindow', 'width=800, height=600, scrollbars=yes');
+};
 
 function WGchangeKey(){
 $.get('WGchangeKey.php', function(result){window.location.reload();});
@@ -538,6 +574,20 @@ $.get('WGmark.php', {WGmark1:WGmark1, WGmark2:WGmark2, WGmark3:WGmark3, WGmark4:
 window.onload = function() {
 $("body").toggleClass("sidebar-toggled");
 $(".sidebar").toggleClass("toggled");
+
+$.get("checkFRP.php", function(data) {
+if ($.trim(data) == "installed") {
+$("#FRPbutton").css("display", "block"); 
+$("#FRPbody").css("display", "block"); 
+};
+});
+
+$.get("checkWG.php", function(data) {
+if ($.trim(data) == "installed") {
+$("#WGbutton").css("display", "block");
+$("#WGbody").css("display", "block");
+};
+});
 
 $.get('WGqrTXT1.php', function(data){
 jQuery('#qrcode1').qrcode({width: 240,height: 240,correctLevel:0,text: data}); 
