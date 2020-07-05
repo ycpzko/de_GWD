@@ -71,6 +71,10 @@ apt update && apt install sudo locales net-tools dnsutils ipset wget curl git jq
 source /etc/profile
 systemctl enable --now haveged >/dev/null 2>&1
 
+chmod -R 755 /var/log/lighttpd
+chown -R www-data:www-data /var/log/lighttpd
+systemctl restart lighttpd
+
 dpkg --configure -a
 
 cat << EOF >/etc/security/limits.conf
@@ -792,7 +796,7 @@ cd ~
 svn export --force https://github.com/jacyl4/de_GWD/branches/$branch/resource/ui-script
 svn export --force https://github.com/jacyl4/de_GWD/branches/$branch/resource/ui-web
 
-if [[ -f ~/ui-script/ui_am4 ]] && [[ -d ~/ui-web/vendor/jquery ]]; then
+if [[ -f ~/ui-script/ui_am4 ]] && [[ -d ~/ui-web/vendor ]]; then
 rm -rf /usr/local/bin/ui-*
 rm -rf /usr/local/bin/ui_*
 rm -rf /var/www/html/*.php
@@ -1043,9 +1047,9 @@ rm -rf ~/wireguard-linux-compat
 cd ~
 fi
 
-if [[ ! -f "/etc/wireguard/wg0.conf" ]]; then
+if [[ -z $(cat /etc/wireguard/wg0.conf) ]]; then
 mkdir -p /etc/wireguard
-output=`/usr/local/bin/ui-WGchangeKey >/dev/null 2>&1`
+output=`/usr/local/bin/ui-WGchangeKey`
 fi
 
 blue "------------------------"

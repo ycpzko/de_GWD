@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "大陆IP：$(ipset list chnroute | grep 'Number of entries' | cut -d: -f2)"
