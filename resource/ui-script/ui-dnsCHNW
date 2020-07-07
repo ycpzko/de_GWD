@@ -15,7 +15,7 @@ cat << EOF >/tmp/v2dns_config
     "tag": "dnsin",
     "port":53,
     "protocol":"dokodemo-door",
-    "settings":{"network":"tcp,udp","address":"1.1.1.1","port":53}
+    "settings":{"network":"tcp,udp","address":"0.0.0.0","port":53}
   }
 ],
 "outbounds":[
@@ -52,9 +52,9 @@ sed -i "$(sed -ne '/url =/=' /etc/dns-over-https/doh-client.conf | awk NR==2)s?.
 jq --arg key1 "$doh1Domain" --arg value1 "$doh1IP" '.dns.hosts += {($key1): ($value1)}' /tmp/v2dns_config |\
 jq --arg key2 "$doh2Domain" --arg value2 "$doh2IP" '.dns.hosts += {($key2): ($value2)}' >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /tmp/v2dns_config
 
-echo $doh1IP >/usr/local/bin/IPdoh
-echo $doh2IP >>/usr/local/bin/IPdoh
-
+echo $doh1IP >/tmp/IPdoh
+echo $doh2IP >>/tmp/IPdoh
+sort /tmp/IPdoh | uniq | sed '/^\s*$/d' >/usr/local/bin/IPdoh
 
 cat /dev/null >/usr/local/bin/IPv2node
 jq -r '.v2node[].domain' /usr/local/bin/0conf | cut -d: -f1 >/tmp/v2node_temp2
@@ -67,6 +67,7 @@ echo $value >>/usr/local/bin/IPv2node
 jq --arg key "$key" --arg value "$value" '.dns.hosts += {($key): ($value)}' /tmp/v2dns_config >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /tmp/v2dns_config
 done
 
+jq 'del(.dns.hosts[] | select(. == ""))' /tmp/v2dns_config >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /tmp/v2dns_config
 
 jq -r '.dns.hosts | to_entries[] | [.key, .value] | @tsv' /usr/local/bin/0conf >/tmp/hosts
 if [[ -n $(cat /tmp/hosts) ]]; then
@@ -74,11 +75,9 @@ if [[ -n $(cat /tmp/hosts) ]]; then
   do
     key=$(echo $line | awk '{print$1}')
     value=$(echo $line | awk '{print$2}')
-  jq --arg key "$key" --arg value "$value" '.dns.hosts += {($key): ($value)}' /tmp/v2dns_config >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /tmp/v2dns_config
+    jq --arg key "$key" --arg value "$value" '.dns.hosts += {($key): ($value)}' /tmp/v2dns_config >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /tmp/v2dns_config
   done
 fi
-
-
 
 jq '.dns.DNSsplit="chnw"' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
 
@@ -86,17 +85,19 @@ if [[ -n $(cat /tmp/v2dns_config) ]]; then
   mv -f /tmp/v2dns_config /usr/local/bin/v2dns/config.json
 fi
 
-rm -rf /tmp/v2dns_temp*
-rm -rf /tmp/v2node_temp*
-rm -rf /tmp/hosts
-rm -rf /tmp/listB
-rm -rf /tmp/listW
-
-chmod 666 /usr/local/bin/v2dns/config.json
-chmod 666 /usr/local/bin/0conf
 
 if [[ $(jq -r '.dns.v2ad' /usr/local/bin/0conf) == "on" ]]; then
 /usr/local/bin/ui-onV2ad
 else
 /usr/local/bin/ui-offV2ad
 fi
+
+rm -rf /tmp/v2dns*
+rm -rf /tmp/v2node*
+rm -rf /tmp/IPdoh*
+rm -rf /tmp/hosts
+rm -rf /tmp/listB
+rm -rf /tmp/listW
+
+chmod 666 /usr/local/bin/v2dns/config.json
+chmod 666 /usr/local/bin/0conf
