@@ -344,6 +344,8 @@ clifwd_PostInstall(){
 /usr/local/bin/ui-saveDNSChina >/dev/null 2>&1
 systemctl restart smartdns
 /usr/local/bin/ui_4h
+systemctl restart doh-client
+systemctl restart v2dns
 /usr/local/bin/ui-NodeDThide >/dev/null 2>&1
 systemctl restart vtrui
 if [[ $(jq -r '.address.udp' /usr/local/bin/0conf) = "on" ]]; then
@@ -359,9 +361,6 @@ fi
 /usr/local/bin/ui_2h
 
 crontab -l > ~/now.cron
-sed -i '/\/usr\/local\/bin\/Q4am/d' ~/now.cron
-sed -i '/\/usr\/local\/bin\/Q4H/d' ~/now.cron
-sed -i '/\/usr\/local\/bin\/Q2H/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/ui_am4/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/ui_4h/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/ui_2h/d' ~/now.cron
@@ -421,7 +420,7 @@ jq --arg clifwd_domain "$clifwd_domain" '.clifwd.clifwd_domain=$clifwd_domain' |
 jq --arg clifwd_port "$clifwd_port" '.clifwd.clifwd_port=$clifwd_port' |\
 jq --arg clifwd_v2path "$clifwd_v2path" '.clifwd.clifwd_v2path=$clifwd_v2path' |\
 jq --arg clifwd_uuidnum "$clifwd_uuidnum" '.clifwd.clifwd_uuidnum=[$clifwd_uuidnum]' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
-chmod -R 666 /usr/local/bin/0conf
+chmod 666 /usr/local/bin/0conf
 
 clifwd_iptablesProxy
 
@@ -448,7 +447,7 @@ sudo pihole -a -p
 piholePW=$(awk '/WEBPASSWORD/' /etc/pihole/setupVars.conf | cut -d= -f2)
 
 jq --arg piholePW "$piholePW" '.address.pihole = $piholePW' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
-chmod -R 666 /usr/local/bin/0conf
+chmod 666 /usr/local/bin/0conf
 blue "------------------------------"
 blue "Change Pi-hole password [done]"
 blue "------------------------------"
@@ -537,7 +536,7 @@ jq --arg clifwd_domain "$clifwd_domain" '.clifwd.clifwd_domain=$clifwd_domain' |
 jq --arg clifwd_port "$clifwd_port" '.clifwd.clifwd_port=$clifwd_port' |\
 jq --arg clifwd_v2path "$clifwd_v2path" '.clifwd.clifwd_v2path=$clifwd_v2path' |\
 jq --arg clifwd_uuidnum "$clifwd_uuidnum" '.clifwd.clifwd_uuidnum=[$clifwd_uuidnum]' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
-chmod -R 666 /usr/local/bin/0conf
+chmod 666 /usr/local/bin/0conf
 
 blue "-----------------------------------------------"
 blue "Change domain and issue new certificates [done]"
@@ -610,9 +609,9 @@ nameserver 127.0.0.1
 EOF
 
 jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
-output=`systemctl restart v2dns`
-output=`systemctl restart vtrui`
-output=`systemctl restart iptables-proxy`
+systemctl restart iptables-proxy
+systemctl restart v2dns
+systemctl restart vtrui
 
 installPihole
 
@@ -628,9 +627,9 @@ fi
 
 output=`/usr/local/bin/ui-saveListBW >/dev/null 2>&1`
 
-output=`systemctl restart v2dns`
-output=`systemctl restart vtrui`
-output=`systemctl restart iptables-proxy`
+systemctl restart iptables-proxy
+systemctl restart v2dns
+systemctl restart vtrui
 
 if [[ ! -d "/var/www/html/gwd" ]]; then
 mkdir -p /var/www/html/gwd
@@ -680,6 +679,15 @@ systemctl daemon-reload >/dev/null 2>&1
 
 cd ~
 source /etc/profile
+crontab -l > ~/now.cron
+sed -i '/\/usr\/local\/bin\/Q4am/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/Q4H/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/Q2H/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_am4/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_4h/d' ~/now.cron
+sed -i '/\/usr\/local\/bin\/ui_2h/d' ~/now.cron
+crontab ~/now.cron
+rm -rf ~/now.cron
 
 piholePW=$(jq -r '.address.pihole' /usr/local/bin/0conf)
 
