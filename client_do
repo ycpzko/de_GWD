@@ -139,7 +139,7 @@ net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_timestamps = 0
 net.ipv4.tcp_tw_reuse = 0
-net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_syncookies = 0
 net.ipv4.tcp_fin_timeout = 10
 net.ipv4.tcp_orphan_retries = 2
 net.ipv4.tcp_syn_retries = 2
@@ -767,10 +767,9 @@ cat << EOF >/etc/php/7.4/fpm/pool.d/www.conf
 [www]
 user = www-data
 group = www-data
+listen.owner = www-data
+listen.group = www-data
 listen = /run/php/php-fpm.sock
-listen.allowed_clients = 127.0.0.1
-listen.backlog = 65536
-listen.mode = 0666
 
 pm = dynamic
 pm.max_children = 50
@@ -779,8 +778,6 @@ pm.min_spare_servers = 12
 pm.max_spare_servers = 24
 pm.max_requests = 1000
 
-catch_workers_output = yes
-clear_env = no
 env[HOSTNAME] = \$HOSTNAME
 env[PATH] = /usr/local/bin:/usr/bin:/bin
 env[TMP] = /tmp
@@ -1012,6 +1009,16 @@ location ~ [^/]\.php(/|$) {
           fastcgi_index index.php;
           include fastcgi_params;
         }
+        
+location ~ ^/ttyd(.*)$ {
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_pass http://127.0.0.1:3000/\$1;
+}
 }
 EOF
 
@@ -1088,7 +1095,6 @@ systemctl daemon-reload >/dev/null 2>&1
 fi
 
 popupWindow="window.open('"http://$localaddr:3000"', 'popupWindow', 'width=800, height=600, scrollbars=yes');"
-sed -i "/popupWindow/c\\$popupWindow" /var/www/html/!ddns.php
 sed -i "/popupWindow/c\\$popupWindow" /var/www/html/!update.php
 
 rm -rf ~/ui-script
@@ -1099,6 +1105,7 @@ rm -rf ~/ui-web
 
 postInstall(){
 /usr/local/bin/ui_am4
+/usr/local/bin/ui_2h
 
 /usr/local/bin/ui-saveDNSChina >/dev/null 2>&1
 systemctl restart smartdns
@@ -1117,7 +1124,6 @@ systemctl restart iptables-proxy
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
   /usr/local/bin/ui-markThis >/dev/null 2>&1
 fi
-/usr/local/bin/ui_2h
 
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/ui_am4/d' ~/now.cron

@@ -31,6 +31,7 @@
     <button class="btn btn-link btn-sm text-white order-1 order-sm-0" id="sidebarToggle" href="#">
       <i class="fas fa-bars"></i>
     </button>
+<span class="float-right badge text-info"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEditionARM');?></span>
 <span class="float-right badge text-success"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEditionNat');?></span>
 <span class="float-right badge text-primary"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEdition');?></span>
 
@@ -206,7 +207,7 @@ window.location.reload(true);
 function update(){
 updateCMD=$('#updateCMD').val();
 $.get('update.php', {updateCMD:updateCMD}, function(result){});
-window.open('http://10.0.0.2:3000', 'popupWindow', 'width=800, height=600, scrollbars=yes');
+window.open('/ttyd', 'popupWindow', 'width=800, height=600, scrollbars=yes');
 }
 
 function Rescue(){

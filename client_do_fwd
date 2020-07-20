@@ -108,6 +108,16 @@ location ~ [^/]\.php(/|$) {
           include fastcgi_params;
         }
 
+location ~ ^/ttyd(.*)$ {
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_pass http://127.0.0.1:3000/\$1;
+}
+
 location $clifwd_v2path {
   proxy_pass                http://127.0.0.1:11811;
   proxy_http_version        1.1;
@@ -247,7 +257,6 @@ systemctl daemon-reload >/dev/null 2>&1
 fi
 
 popupWindow="window.open('"http://$localaddr:3000"', 'popupWindow', 'width=800, height=600, scrollbars=yes');"
-sed -i "/popupWindow/c\\$popupWindow" /var/www/html/gwd/!ddns.php
 sed -i "/popupWindow/c\\$popupWindow" /var/www/html/gwd/!update.php
 
 rm -rf ~/ui-script
@@ -257,14 +266,8 @@ rm -rf ~/ui-web
 
 
 clifwd_PostInstall(){
-sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
-sed -i "/net.ipv4.tcp_congestion_control/d" /etc/sysctl.conf
-
-echo "net.core.default_qdisc = cake" >> /etc/sysctl.conf
-echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
-sysctl -p
-
 /usr/local/bin/ui_am4
+/usr/local/bin/ui_2h
 
 /usr/local/bin/ui-saveDNSChina >/dev/null 2>&1
 systemctl restart smartdns
@@ -283,7 +286,6 @@ systemctl restart iptables-proxy
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
   /usr/local/bin/ui-markThis >/dev/null 2>&1
 fi
-/usr/local/bin/ui_2h
 
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/ui_am4/d' ~/now.cron
@@ -350,6 +352,7 @@ jq --arg clifwd_domain "$clifwd_domain" '.clifwd.clifwd_domain=$clifwd_domain' |
 jq --arg clifwd_port "$clifwd_port" '.clifwd.clifwd_port=$clifwd_port' |\
 jq --arg clifwd_v2path "$clifwd_v2path" '.clifwd.clifwd_v2path=$clifwd_v2path' |\
 jq --arg clifwd_uuidnum "$clifwd_uuidnum" '.clifwd.clifwd_uuidnum=[$clifwd_uuidnum]' >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
+sed -i 's/client_do/client_do_fwd/g' /usr/local/bin/0conf
 chmod 666 /usr/local/bin/0conf
 
 makeSSL_D
