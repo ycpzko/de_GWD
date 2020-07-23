@@ -188,7 +188,7 @@ net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.neigh.default.gc_thresh1 = 1024
 net.ipv4.neigh.default.gc_thresh2 = 2048
 net.ipv4.neigh.default.gc_thresh3 = 4096
-net.core.default_qdisc = fq_codel
+net.core.default_qdisc = cake
 net.ipv4.tcp_congestion_control = bbr
 EOF
 
@@ -987,31 +987,33 @@ location ~ /\.(?!well-known).* {
 }
 
 location ~ [^/]\.php(/|$) {
-          fastcgi_pass unix:/run/php/php-fpm.sock;
-          fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-          fastcgi_index index.php;
-          include fastcgi_params;
-        }
+  fastcgi_pass unix:/run/php/php-fpm.sock;
+  fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+  fastcgi_index index.php;
+  include fastcgi_params;
+}
         
 location ~ ^/ttyd(.*)$ {
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_pass http://127.0.0.1:3000/\$1;
+  proxy_http_version 1.1;
+  proxy_set_header Host \$host;
+  proxy_set_header X-Forwarded-Proto \$scheme;
+  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+  proxy_set_header Upgrade \$http_upgrade;
+  proxy_set_header Connection "upgrade";
+  proxy_pass http://127.0.0.1:3000/\$1;
 }
 }
 EOF
 
 mkdir -p /var/www/ssl
 
-if [[ $(ls -A "/var/www/ssl" | wc -w) == "0" ]]; then
+if [[ ! -f "/var/www/ssl/ocsp.resp" ]]; then
 cd /var/www/ssl
+rm -rf /var/www/ssl/*
 openssl req -x509 -nodes -days 3650 \
   -subj "/C=CA/ST=QC/O=Company, Inc./CN=localhost.com" \
-  -addext "subjectAltName=DNS:localhost.com" \
+  -config <(cat /etc/ssl/openssl.cnf \
+    <(printf '[SAN]\nsubjectAltName=DNS:localhost')) \
   -newkey rsa:2048 \
   -keyout de_GWD.key \
   -out de_GWD.cer
@@ -1344,8 +1346,11 @@ rm -rf /etc/modules-load.d/nf_conntrack.conf
 rm -rf /lib/systemd/system/ttyd.service
 systemctl daemon-reload >/dev/null 2>&1
 
-cd ~
-source /etc/profile
+rm -rf /var/www/html/gwd
+jq 'del(.clifwd)' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0conf_temp /usr/local/bin/0conf
+mv -f /var/www/ssl/*.cer /var/www/ssl/de_GWD.cer >/dev/null 2>&1
+mv -f /var/www/ssl/*.key /var/www/ssl/de_GWD.key >/dev/null 2>&1
+
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4am/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q4H/d' ~/now.cron
@@ -1355,6 +1360,11 @@ sed -i '/\/usr\/local\/bin\/ui_4h/d' ~/now.cron
 sed -i '/\/usr\/local\/bin\/ui_2h/d' ~/now.cron
 crontab ~/now.cron
 rm -rf ~/now.cron
+
+
+
+cd ~
+source /etc/profile
 
 piholePW=$(jq -r '.address.pihole' /usr/local/bin/0conf)
 
