@@ -12,14 +12,24 @@
   <meta name="description" content="">
   <meta name="author" content="">
 
-  <title>DDNS & LINK</title>
+<title>DDNS & LINK</title>
 
   <!-- Custom fonts for this template-->
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
 
-
   <!-- Custom styles for this template-->
   <link href="css/sb-admin.min.css" rel="stylesheet">
+
+  <!-- Bootstrap core JavaScript-->
+  <script src="vendor/jquery/jquery.min.js"></script>
+  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Core plugin JavaScript-->
+  <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+
+  <!-- Custom scripts for all pages-->
+  <script src="js/sb-admin.min.js"></script>
+  <script src="js/jquery.qrcode.min.js"></script>
 
 </head>
 
@@ -32,9 +42,9 @@
     <button class="btn btn-link btn-sm text-white order-1 order-sm-0" id="sidebarToggle" href="#">
       <i class="fas fa-bars"></i>
     </button>
+<span class="float-right badge text-primary"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEdition');?></span>
 <span class="float-right badge text-info"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEditionARM');?></span>
 <span class="float-right badge text-success"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEditionFWD');?></span>
-<span class="float-right badge text-primary"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEdition');?></span>
 
     <!-- Navbar Search -->
     <form class="d-none d-md-inline-block form-inline ml-auto mr-0 mr-md-3 my-2 my-md-0">
@@ -109,8 +119,8 @@
 
         <!-- Page Content -->
       <div class="col-md-6 input-group mx-auto mb-3">
-        <div class="input-group-prepend w-25">
-          <span class="input-group-text justify-content-center w-100">Wan IP</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">Wan IP</span>
         </div>
           <span class="form-control text-center" id="wanIP"></span>
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" onclick="showIP()">查询</button>
@@ -133,14 +143,14 @@
     <div class="form-row">
       <div class="col-md-6 input-group my-2">
         <div class="input-group-prepend">
-          <span class="input-group-text justify-content-center w-100" style="min-width: 120px;">域名</span>
+          <span class="input-group-text justify-content-center" style="min-width: 120px;">域名</span>
         </div>
           <input type="text" id="CFdomain" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->ddns->ddnsCF->cfDomain ?>">
       </div>
 
       <div class="col-md-6 input-group my-2">
         <div class="input-group-prepend">
-          <span class="input-group-text justify-content-center w-100" style="min-width: 120px;">Zone ID</span>
+          <span class="input-group-text justify-content-center" style="min-width: 120px;">Zone ID</span>
         </div>
           <input type="text" id="CFzoneid" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->ddns->ddnsCF->cfZoneID ?>">
       </div>
@@ -149,14 +159,14 @@
     <div class="form-row">
       <div class="col-md-6 input-group my-2">
         <div class="input-group-prepend">
-          <span class="input-group-text justify-content-center w-100" style="min-width: 120px;">CF API KEY</span>
+          <span class="input-group-text justify-content-center" style="min-width: 120px;">CF API KEY</span>
         </div>
           <input type="text" id="CFapikey" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->ddns->ddnsCF->cfAPIkey ?>">
       </div>
 
       <div class="col-md-6 input-group my-2">
         <div class="input-group-prepend">
-          <span class="input-group-text justify-content-center w-100" style="min-width: 120px;">CF E-mail</span>
+          <span class="input-group-text justify-content-center" style="min-width: 120px;">CF E-mail</span>
         </div>
           <input type="text" id="CFemail" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->ddns->ddnsCF->cfEmail ?>">
       </div>
@@ -265,13 +275,15 @@
           <div class="card-body" id="WGbody" style="display:none">
 
 <div class="form-row mb-3">
-      <div class="col-md-6 input-group mb-1 mx-auto">
+      <div class="col-md-4 input-group mb-1 ml-auto">
         <div class="input-group-prepend">
           <span class="input-group-text justify-content-center">Endpoint</span>
           <span class="input-group-text justify-content-center">域名/公网IP</span>
         </div>
           <input type="text" id="WGaddress" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGdomain ?>">
-          <div class="input-group-append">
+      </div>
+      <div class="col-md-4 input-group mb-1 mr-auto">
+          <div class="input-group-prepend">
           <span class="input-group-text justify-content-center">UDP端口</span>
           </div>
           <input type="text" id="WGaddressport" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGport ?>">
@@ -282,18 +294,18 @@
 
 <div class="form-row mb-3">
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点1</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点1</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark1" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[0] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop1" onclick="submitWGmark()">显示二维码</button>
       </div>
 
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点2</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点2</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark2" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[1] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop2" onclick="submitWGmark()">显示二维码</button>
@@ -302,18 +314,18 @@
 
 <div class="form-row mb-3">
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点3</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点3</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark3" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[2] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop3" onclick="submitWGmark()">显示二维码</button>
       </div>
 
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点4</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点4</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark4" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[3] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop4" onclick="submitWGmark()">显示二维码</button>
@@ -322,18 +334,18 @@
 
 <div class="form-row mb-3">
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点5</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点5</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark5" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[4] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop5" onclick="submitWGmark()">显示二维码</button>
       </div>
 
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点6</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点6</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark6" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[5] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop6" onclick="submitWGmark()">显示二维码</button>
@@ -342,18 +354,18 @@
 
 <div class="form-row mb-3">
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点7</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点7</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark7" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[6] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop7" onclick="submitWGmark()">显示二维码</button>
       </div>
 
       <div class="col-md-6 input-group mb-1">
-        <div class="input-group-prepend w-50">
-          <span class="input-group-text justify-content-center w-100">节点8</span>
-          <span class="input-group-text justify-content-center w-100">备注：</span>
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">节点8</span>
+          <span class="input-group-text justify-content-center">备注：</span>
         </div>
           <input type="text" id="WGmark8" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->wireguard->WGmark[7] ?>">
           <button type="button" class="btn btn-secondary btn-sm" style="border-Radius: 0px;" data-toggle="modal" data-target="#wgqrpop8" onclick="submitWGmark()">显示二维码</button>
@@ -650,17 +662,6 @@ jQuery('#qrcode8').qrcode({width: 240,height: 240,correctLevel:0,text: data});
   <a class="scroll-to-top rounded" href="#page-top">
     <i class="fas fa-angle-up"></i>
   </a>
-
-  <!-- Bootstrap core JavaScript-->
-  <script src="vendor/jquery/jquery.min.js"></script>
-  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
-  <!-- Core plugin JavaScript-->
-  <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
-
-  <!-- Custom scripts for all pages-->
-  <script src="js/sb-admin.min.js"></script>
-  <script src="js/jquery.qrcode.min.js"></script>
 
 </body>
 

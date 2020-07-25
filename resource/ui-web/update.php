@@ -12,7 +12,7 @@
   <meta name="description" content="">
   <meta name="author" content="">
 
-  <title>更新</title>
+<title>更新</title>
 
   <!-- Custom fonts for this template-->
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
@@ -20,6 +20,16 @@
   <!-- Custom styles for this template-->
   <link href="css/sb-admin.min.css" rel="stylesheet">
 
+  <!-- Bootstrap core JavaScript-->
+  <script src="vendor/jquery/jquery.min.js"></script>
+  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Core plugin JavaScript-->
+  <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+
+  <!-- Custom scripts for all pages-->
+  <script src="js/sb-admin.min.js"></script>
+  
 </head>
 
 <body id="page-top" class="sidebar-toggled">
@@ -31,9 +41,9 @@
     <button class="btn btn-link btn-sm text-white order-1 order-sm-0" id="sidebarToggle" href="#">
       <i class="fas fa-bars"></i>
     </button>
+<span class="float-right badge text-primary"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEdition');?></span>
 <span class="float-right badge text-info"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEditionARM');?></span>
 <span class="float-right badge text-success"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEditionFWD');?></span>
-<span class="float-right badge text-primary"><?php echo shell_exec('sudo /usr/local/bin/ui-checkEdition');?></span>
 
     <!-- Navbar Search -->
     <form class="d-none d-md-inline-block form-inline ml-auto mr-0 mr-md-3 my-2 my-md-0">
@@ -115,13 +125,10 @@
           </div>
           <div class="card-body">
 
-  <div class="my-2 float-left">
-<button type="button" class="btn btn-outline-secondary" onclick="backup()">备份下载</button>
-  </div>
+    <div class="form-row">
+<button type="button" class="btn btn-outline-secondary my-2" onclick="backup()">备份下载</button>
 
-  <div class="my-2 col-md-4 float-left">
-<form>
-<div class="input-group">
+<div class="input-group col-md-4 my-2">
   <div class="custom-file">
     <input type="file" class="custom-file-input" id="restorefile">
     <label class="custom-file-label" for="restorefile">...</label>
@@ -130,8 +137,7 @@
     <button type="button" class="btn btn-outline-secondary" onclick="restore()">上传恢复</button>
   </div>
 </div>
-</form>
-  </div>
+    </div>
 
           </div>
         </div>
@@ -148,16 +154,15 @@
           <div class="card-body">
 
     <div class="form-row">
-      <div class="col-md-10 input-group my-2">
-        <div class="input-group-prepend w-15">
-          <span class="input-group-text justify-content-center w-100">CMD</span>
+      <div class="input-group my-2">
+        <div class="input-group-prepend">
+          <span class="input-group-text justify-content-center">CMD</span>
         </div>
           <input type="text" id="updateCMD" class="form-control" value="<?php echo json_decode(file_get_contents('/usr/local/bin/0conf'))->updateCMD ?>">
         <div class="input-group-append">
           <button type="button" class="btn btn-outline-danger text-right px-3" onclick="update()">运行</button>
         </div>
       </div>
-      
     </div>
 
 
@@ -236,17 +241,6 @@ $(".custom-file-input").on("change", function() {
   <a class="scroll-to-top rounded" href="#page-top">
     <i class="fas fa-angle-up"></i>
   </a>
-
-  <!-- Bootstrap core JavaScript-->
-  <script src="vendor/jquery/jquery.min.js"></script>
-  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
-  <!-- Core plugin JavaScript-->
-  <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
-
-  <!-- Custom scripts for all pages-->
-  <script src="js/sb-admin.min.js"></script>
-  <script src="js/jquery.qrcode.min.js"></script>
 
 </body>
 

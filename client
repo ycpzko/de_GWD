@@ -188,7 +188,7 @@ net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.neigh.default.gc_thresh1 = 1024
 net.ipv4.neigh.default.gc_thresh2 = 2048
 net.ipv4.neigh.default.gc_thresh3 = 4096
-net.core.default_qdisc = cake
+net.core.default_qdisc = fq_codel
 net.ipv4.tcp_congestion_control = bbr
 EOF
 
@@ -1453,6 +1453,7 @@ else
 fi
 
 blue "-----------------------------------------------"
+blue "Kernel ：$(uname -r)"
 blue "Current tcp congestion control ：$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | cut -d' ' -f3) + $(sysctl net.core.default_qdisc 2>/dev/null | cut -d' ' -f3)"
 blue "-----------------------------------------------"
 
