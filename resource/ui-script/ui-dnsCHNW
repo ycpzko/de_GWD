@@ -6,8 +6,8 @@ cat << EOF >/tmp/v2dns_config
   "servers":[
   {"address":"127.0.0.1","port":5390},
   {"address":"127.0.0.1","port":5390,"domains":["domain:google.com"]},
-  {"address":"127.0.0.1","port":5310,"domains":["domain:baidu.com"]},
-  {"address":"127.0.0.1","port":5310,"domains":["geosite:cn"],"expectIPs":["geoip:cn"]}
+  {"address":"127.0.0.1","port":5310,"domains":["geosite:cn","geosite:tld-cn"],"expectIPs":["geoip:cn"]},
+  {"address":"127.0.0.1","port":5310,"domains":["domain:baidu.com"]}
   ]
 },
 "inbounds":[
@@ -84,13 +84,6 @@ jq '.dns.DNSsplit="chnw"' /usr/local/bin/0conf >/tmp/0conf_temp && mv -f /tmp/0c
 
 if [[ -n $(cat /tmp/v2dns_config) ]]; then
   mv -f /tmp/v2dns_config /usr/local/bin/v2dns/config.json
-fi
-
-
-if [[ $(jq -r '.dns.v2ad' /usr/local/bin/0conf) == "on" ]]; then
-/usr/local/bin/ui-V2ADon
-else
-/usr/local/bin/ui-V2ADoff
 fi
 
 rm -rf /tmp/v2dns*
