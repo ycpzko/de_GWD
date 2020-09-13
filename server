@@ -58,18 +58,19 @@ deb http://security.debian.org/debian-security $(cat /etc/os-release | grep VERS
 deb http://deb.debian.org/debian/ $(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)-updates main contrib non-free
 EOF
 
-apt update
-apt upgrade && apt autoremove && apt autoclean
-
-apt install sudo locales net-tools netcat dnsutils resolvconf wget curl rsync git jq unzip ca-certificates apt-transport-https gnupg2 haveged socat
+apt update && apt install sudo locales net-tools netcat dnsutils resolvconf wget curl rsync git jq unzip ca-certificates apt-transport-https gnupg2 haveged socat
 source /etc/profile
 systemctl enable --now haveged >/dev/null 2>&1
 
 echo "deb [arch=amd64] https://download.docker.com/linux/debian $(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1) stable" > /etc/apt/sources.list.d/docker.list
 curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
 
+echo "deb https://packages.sury.org/php/ $(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1) main" > /etc/apt/sources.list.d/php.list
+curl -fsSL  https://packages.sury.org/php/apt.gpg | apt-key add -
+
 apt update
 apt install docker-ce docker-ce-cli containerd.io
+apt upgrade && apt autoremove && apt autoclean
 
 sed -i "/LimitNOFILE=/c\LimitNOFILE=1000000"  /lib/systemd/system/docker.service
 sed -i "/LimitNPROC=/c\LimitNPROC=64000"  /lib/systemd/system/docker.service
@@ -150,7 +151,7 @@ sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
 sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf
 
 if [[ $(uname -r) =~ "bbrplus" ]]; then
-  echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
+  echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
   echo "net.ipv4.tcp_congestion_control = bbrplus" >> /etc/sysctl.conf
 elif [[ $(uname -r) > "5.6" ]]; then
   echo "net.core.default_qdisc = cake" >> /etc/sysctl.conf
@@ -956,8 +957,11 @@ wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/mast
 dpkg -i linux-headers-*.deb
 dpkg -i linux-image-*.deb
 
-apt purge -y linux-image-amd64
-apt purge -y linux-image-*-amd64
+dpkg --list | grep linux-image | awk '{print $2}' | sed '/bbrplus/d' | while read line
+do
+apt purge -y $line
+done
+
 update-grub
 
 cat << EOF >~/bbrkernel/clearkernel
@@ -967,7 +971,7 @@ PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
 sed -i "/net.ipv4.tcp_congestion_control/d" /etc/sysctl.conf
 
-echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
+echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control = bbrplus" >> /etc/sysctl.conf
 sysctl -p
 
@@ -1004,8 +1008,11 @@ wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/mast
 dpkg -i linux-headers-*.deb
 dpkg -i linux-image-*.deb
 
-apt purge -y linux-image-amd64
-apt purge -y linux-image-*-amd64
+dpkg --list | grep linux-image | awk '{print $2}' | sed '/5.7.7/d' | sed '/5.6.15/d' | while read line
+do
+apt purge -y $line
+done
+
 update-grub
 
 cat << EOF >~/bbrkernel/clearkernel
@@ -1440,7 +1447,7 @@ if [[ -f "/usr/local/bin/version.php" ]]; then
 fi
     echo ""
     green  "1. Install de_GWD"
-    green  "2. Install bbrplus+fq and reboot"
+    green  "2. Install bbrplus+fq_codel and reboot"
     green  "3. Install bbr+cake and reboot"
     red    "5. Change static IP"
     red    "6. Change domain and generate new certificate"
