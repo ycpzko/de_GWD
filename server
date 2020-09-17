@@ -149,21 +149,10 @@ net.ipv4.tcp_keepalive_probes = 5
 net.ipv4.tcp_rfc1337 = 1
 net.ipv4.tcp_low_latency = 1
 net.ipv4.tcp_slow_start_after_idle = 0
+net.core.default_qdisc = cake
+net.ipv4.tcp_congestion_control = bbr
 EOF
 
-sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
-sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf
-
-if [[ $(uname -r) =~ "bbrplus" ]]; then
-  echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
-  echo "net.ipv4.tcp_congestion_control = bbrplus" >> /etc/sysctl.conf
-elif [[ $(uname -r) > "5.6" ]]; then
-  echo "net.core.default_qdisc = cake" >> /etc/sysctl.conf
-  echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
-else
-  echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
-  echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
-fi
 sysctl -p
 
 echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
@@ -751,6 +740,14 @@ location /dq {
   proxy_pass                http://127.0.0.1:8053/dq;
   proxy_set_header          Host \$host;
   proxy_set_header          X-Real-IP \$remote_addr;
+  proxy_connect_timeout     432000;
+  proxy_send_timeout        432000;
+  proxy_read_timeout        432000;
+  proxy_redirect            off;
+  proxy_buffering           off;
+  proxy_buffer_size         16k;
+  keepalive_requests        25600;
+  keepalive_timeout         300 300;
 }
 
 location $v2path {
@@ -766,7 +763,9 @@ location $v2path {
   proxy_read_timeout        432000;
   proxy_redirect            off;
   proxy_buffering           off;
-  proxy_buffer_size         4k;
+  proxy_buffer_size         16k;
+  keepalive_requests        25600;
+  keepalive_timeout         300 300;
 }
 }
 EOF
@@ -952,58 +951,7 @@ blue "---------------------------------------------"
 
 
 
-installBBRplus(){
-export DEBIAN_FRONTEND=noninteractive
-apt install -y wget
-mkdir -p ~/bbrkernel && cd ~/bbrkernel
-wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-headers-4.14.168-bbrplus_4.14.168-bbrplus-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
-wget --no-check-certificate https://raw.githubusercontent.com/jacyl4/de_GWD/master/resource/linux-image-4.14.168-bbrplus_4.14.168-bbrplus-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
-dpkg -i linux-headers-*.deb
-dpkg -i linux-image-*.deb
-
-dpkg --list | grep linux-image | awk '{print $2}' | sed '/bbrplus/d' | while read line
-do
-apt purge -y $line
-done
-
-update-grub
-
-cat << EOF >~/bbrkernel/clearkernel
-#!/bin/bash
-PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-
-sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
-sed -i "/net.ipv4.tcp_congestion_control/d" /etc/sysctl.conf
-
-echo "net.core.default_qdisc = fq_codel" >> /etc/sysctl.conf
-echo "net.ipv4.tcp_congestion_control = bbrplus" >> /etc/sysctl.conf
-sysctl -p
-
-crontab -l > ~/now.cron
-sed -i '/clearkernel/d' ~/now.cron
-crontab ~/now.cron
-rm -rf ~/now.cron
-rm -rf ~/bbrkernel
-
-systemctl restart sshd
-EOF
-
-chmod +x ~/bbrkernel/clearkernel
-
-crontab -l > ~/now.cron
-echo '@reboot ~/bbrkernel/clearkernel' >> ~/now.cron
-crontab ~/now.cron
-rm -rf ~/now.cron
-
-reboot
-blue "-----------------------"
-blue  "Install bbrplus [done]"
-blue "-----------------------"
-}
-
-
-
-installBBR(){
+installKernel(){
 export DEBIAN_FRONTEND=noninteractive
 apt install -y wget
 mkdir -p ~/bbrkernel && cd ~/bbrkernel
@@ -1447,8 +1395,7 @@ if [[ -f "/usr/local/bin/version.php" ]]; then
 fi
     echo ""
     green  "1. Install de_GWD"
-    green  "2. Install bbrplus+fq_codel and reboot"
-    green  "3. Install bbr+cake and reboot"
+    green  "2. Install latest kernel and reboot"
     red    "5. Change static IP"
     red    "6. Change domain and generate new certificate"
     red    "7. Change v2ray path & UUID"
@@ -1466,11 +1413,7 @@ fi
     start_menu
     ;;
     2)
-    installBBRplus
-    start_menu
-    ;;
-    3)
-    installBBR
+    installKernel
     start_menu
     ;;
     5)
