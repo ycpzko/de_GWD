@@ -44,11 +44,7 @@ location $FWD1path {
   proxy_send_timeout        432000;
   proxy_read_timeout        432000;
   proxy_redirect            off;
-  proxy_buffering           on;
-  proxy_buffer_size         4k;
-  proxy_buffers             8 128k;
-  proxy_busy_buffers_size   256k;
-  proxy_max_temp_file_size  256k;
+  proxy_buffering           off;
 }
 }
 EOF
@@ -57,33 +53,4 @@ if [[ -f "/lib/systemd/system/nginx.service" ]];then
     sed -i '/ssl_early_data/d' /etc/nginx/conf.d/forward1.conf
 fi
 
-rm -rf /usr/local/bin/vtrui1
-mkdir -p /usr/local/bin/vtrui1
-cp -f /usr/local/bin/vtrui/vtrui /usr/local/bin/vtrui1/vtrui1
-cp -f /usr/local/bin/vtrui/v2ctl /usr/local/bin/vtrui1/v2ctl
-chmod -R +x /usr/local/bin/vtrui1
-
-cat << "EOF" > /lib/systemd/system/vtrui1.service
-[Unit]
-Description=vtrui1 Service
-After=network.target nss-lookup.target
-Wants=network-online.target
-
-[Service]
-User=root
-Type=simple
-LimitNPROC=64000
-LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
-ExecStart=/usr/local/bin/vtrui1/vtrui1 -config /usr/local/bin/vtrui1/config.json
-Restart=always
-RestartSec=2
-StartLimitBurst=0
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable vtrui1
-systemctl restart vtrui1
+/etc/nginx/conf.d/merge.sh
