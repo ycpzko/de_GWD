@@ -25,9 +25,6 @@ echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
 echo "RESUME=" > /etc/initramfs-tools/conf.d/resume
 fi
 
-date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
-hwclock -w
-
 rm -rf /etc/resolv.conf
 
 cat << EOF >/etc/resolv.conf
@@ -36,6 +33,9 @@ nameserver 8.8.8.8
 nameserver 1.0.0.1
 nameserver 8.8.4.4
 EOF
+
+date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
+hwclock -w
 
 cat << EOF >/etc/apt/apt.conf.d/01InstallLess
 APT::Get::Assume-Yes "true";
@@ -90,8 +90,6 @@ cat << EOF >/etc/security/limits.conf
 EOF
 
 echo "ulimit -n 1000000" > ~/.bash_profile
-
-modprobe ip_conntrack
 
 cat << EOF >/etc/sysctl.conf
 vm.overcommit_memory = 1
@@ -333,7 +331,6 @@ LimitNPROC=64000
 LimitNOFILE=1000000
 ExecStart=/usr/local/bin/doh-server -conf /usr/local/bin/doh-server.conf
 Restart=always
-RestartSec=2
 StartLimitBurst=0
 
 [Install]
@@ -414,7 +411,6 @@ LimitNOFILE=1000000
 CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
 ExecStart=/usr/local/bin/vtrui/vtrui -config /usr/local/bin/vtrui/config.json
 Restart=always
-RestartSec=2
 StartLimitBurst=0
 
 [Install]
@@ -514,6 +510,7 @@ http {
 
   access_log off;
   error_log off;
+  log_not_found off;
 
   include /etc/nginx/conf.d/*.conf;
 }
@@ -783,6 +780,21 @@ chmod +x /etc/nginx/conf.d/merge.sh
 
 
 postInstall(){
+indexpage=$(ls /var/www/html/index.* 2>/dev/null | wc -l)
+if [ "$indexpage" = "0" ]; then 
+wget --no-check-certificate -c -O ~/sample.zip https://raw.githubusercontent.com/jacyl4/de_GWD/main/resource/sample.zip
+unzip ~/sample.zip
+rsync -azrI ~/sample/* /var/www/html/
+rm -rf ~/sample*
+fi
+
+rm -rf /usr/local/bin/version.php
+wget --no-check-certificate -c -O /usr/local/bin/version.php https://raw.githubusercontent.com/jacyl4/de_GWD/main/version.php
+
+if [[ $(ls -l /var/www/html/spt 2>/dev/null | awk '{print$5}') != "104857600" ]]; then
+  dd if=/dev/zero of=/var/www/html/spt bs=1k count=100k status=progress
+fi
+
 cat << "EOF" > /usr/local/bin/autoUpdate
 #!/bin/bash
 wget --no-check-certificate -c -O ~/update https://raw.githubusercontent.com/jacyl4/de_GWD/main/server
@@ -823,27 +835,13 @@ fi
 EOF
 
 chmod +x /usr/local/bin/Q2H
+/usr/local/bin/Q2H
 
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/Q2H/d' ~/now.cron
 echo '0 */2 * * * /usr/local/bin/Q2H' >> ~/now.cron
 crontab ~/now.cron
 rm -rf ~/now.cron
-
-indexpage=$(ls /var/www/html/index.* 2>/dev/null | wc -l)
-if [ "$indexpage" = "0" ]; then 
-wget --no-check-certificate -c -O ~/sample.zip https://raw.githubusercontent.com/jacyl4/de_GWD/main/resource/sample.zip
-unzip ~/sample.zip
-rsync -azrI ~/sample/* /var/www/html/
-rm -rf ~/sample*
-fi
-
-rm -rf /usr/local/bin/version.php
-wget --no-check-certificate -c -O /usr/local/bin/version.php https://raw.githubusercontent.com/jacyl4/de_GWD/main/version.php
-
-if [[ $(ls -l /var/www/html/spt 2>/dev/null | awk '{print$5}') != "104857600" ]]; then
-  dd if=/dev/zero of=/var/www/html/spt bs=1k count=100k status=progress
-fi
 }
 
 
