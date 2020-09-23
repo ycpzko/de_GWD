@@ -123,13 +123,13 @@
             <div class="card text-white bg-dark o-hidden h-100">
               <div class="card-body">
                 <div class="card-body-icon">
-                  <i class="fas fa-toggle-on"></i>
+                  <i class="fas fa-bell"></i>
                 </div>
-                <div class="">快捷选项</div>
+                <div class="">版本检测</div>
               </div>
               <a class="card-footer text-white clearfix small z-1">
-                <h6 class="float-left" style="margin-bottom: 0"><button class="btn btn-light" style="font-size:0.75rem;font-weight:600;line-height:0.35;border-radius:10rem;" onclick="restartProxy()">重启进程</button></h6>
-                <h6 class="float-right" style="margin-bottom: 0"><button class="btn btn-light" style="font-size:0.75rem;font-weight:600;line-height:0.35;border-radius:10rem;" data-toggle="modal" data-target="#markThis">备注本机</button></h6>
+                <h6 class="float-left" style="margin-bottom: 0"><span id="currentver" class="badge badge-pill badge-light"></span></h6>
+                <h6 class="float-right" style="margin-bottom: 0"><span id="remotever" class=""></span></h6>
               </a>
             </div>
           </div>
@@ -138,13 +138,13 @@
             <div class="card text-white bg-dark o-hidden h-100">
               <div class="card-body">
                 <div class="card-body-icon">
-                  <i class="fas fa-bell"></i>
+                  <i class="fas fa-toggle-on"></i>
                 </div>
-                <div class="">版本检测</div>
+                <div class="">快捷选项</div>
               </div>
               <a class="card-footer text-white clearfix small z-1">
-                <h6 class="float-left" style="margin-bottom: 0"><span id="currentver" class="badge badge-pill badge-light"></span></h6>
-                <h6 class="float-right" style="margin-bottom: 0"><span id="remotever" class=""></span></h6>
+                <h6 class="float-left" style="margin-bottom: 0"><button class="btn btn-light" style="font-size:0.75rem;font-weight:600;line-height:0.35;border-radius:10rem;" onclick="restartProxy()">重启进程</button></h6>
+                <h6 class="float-right" style="margin-bottom: 0"><button class="btn btn-light" style="font-size:0.75rem;font-weight:600;line-height:0.35;border-radius:10rem;" data-toggle="modal" data-target="#markThis">备注本机</button></h6>
               </a>
             </div>
           </div>
@@ -183,6 +183,19 @@
   </div>
 </div>
 
+<div class="modal fade" id="reboot" tabindex="-1" role="dialog" aria-labelledby="reboot" aria-hidden="true">
+  <div class="modal-dialog modal-sm" style="top:50%" role="document">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">重启本机</h5>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-sm btn-dark" onclick="submitstaticip()">立即重启</button>
+      </div>
+    </div>
+  </div>
+</div>
 
         <!-- DataTables Example -->
         <div class="card mb-3">
@@ -377,7 +390,7 @@
             <i class="fas fa-exchange-alt"></i>
             IP地址
           <span class="float-right mt-n1 mb-n2">
-                <button type="button" class="btn btn-outline-secondary btn-sm mt-1" style="border-radius: 0px;" onclick="submitstaticip()">重启</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm mt-1" style="border-radius: 0px;" data-toggle="modal" data-target="#reboot">重启</button>
           </span>
           </div>
           <div class="card-body">
@@ -461,26 +474,6 @@
 <script>
 function logout(){
 $.get('auth.php', {logout:'true'}, function(result){ window.location.href="index.php" });
-}
-
-function checklink(){
-$.get('./act/testBaidu.php',function(data) {
-var checklink1 = data;
-if ( $.trim(checklink1) == "ONLINE" ) {
-$('#testBaidu').text("✓ 国内线路畅通");
-} else {
-$('#testBaidu').text("✗ 国内线路不通");
-}
-});
-
-$.get('./act/testYoutue.php',function(data) {
-var checklink2 = data;
-if ( $.trim(checklink2) == "ONLINE" ) {
-$('#testYoutue').text("✓ 国外线路畅通");
-} else {
-$('#testYoutue').text("✗ 国外线路不通");
-}
-});
 }
 
 function restartProxy(){
@@ -598,6 +591,41 @@ function offDHCP(){
 $.get('./act/offDHCP.php', function(result){window.location.reload();});
 }
 
+function checklink(){
+$.get('./act/testBaidu.php',function(data) {
+var checklink1 = data;
+if ( $.trim(checklink1) == "ONLINE" ) {
+$('#testBaidu').text("✓ 国内线路畅通");
+} else {
+$('#testBaidu').text("✗ 国内线路不通");
+}
+});
+
+$.get('./act/testYoutue.php',function(data) {
+var checklink2 = data;
+if ( $.trim(checklink2) == "ONLINE" ) {
+$('#testYoutue').text("✓ 国外线路畅通");
+} else {
+$('#testYoutue').text("✗ 国外线路不通");
+}
+});
+
+$.get("./act/version.php", function(data) {
+var currentvernum = data.split("-")[0].substring(0);
+var remotevernum = data.split("-")[1].substring(0);
+var vera = $.trim(currentvernum);
+var verb = $.trim(remotevernum);
+$('#currentver').html(currentvernum+'本机');
+$('#remotever').html(remotevernum+' 发布');
+
+if (vera == verb) {
+$('#remotever').addClass('badge badge-pill badge-light');
+} else {
+$('#remotever').addClass('badge badge-pill badge-warning');
+};
+});
+}
+
 window.onload = function() {
 $.get('./act/v2node.php', function(data) {
 var nodeList = JSON.parse(data);
@@ -638,21 +666,6 @@ for( let i = 0; i<len; i++){
 };
 });
 
-$.get("./act/version.php", function(data) {
-var currentvernum = data.split("-")[0].substring(0);
-var remotevernum = data.split("-")[1].substring(0);
-$('#currentver').html(currentvernum+'本机');
-$('#remotever').html(remotevernum+' 发布');
-
-var vera = $.trim(currentvernum);
-var verb = $.trim(remotevernum);
-if (vera == verb) {
-$('#remotever').addClass('badge badge-pill badge-light');
-} else {
-$('#remotever').addClass('badge badge-pill badge-warning');
-};
-});
-
 $.get('./act/uptime.php', function(data) { $('#uptime').text(data) });
 
 setInterval(function() {
@@ -675,7 +688,6 @@ checklink();
 
   <!-- Custom scripts for all pages-->
   <script src="js/sb-admin.min.js"></script>
-  <script src="js/bootstrap4-toggle.min.js"></script>
 
 </body>
 
