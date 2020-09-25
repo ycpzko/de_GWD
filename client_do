@@ -13,7 +13,7 @@ export DEBIAN_FRONTEND=noninteractive
 export PIHOLE_SKIP_OS_CHECK=true
 branch="main"
 
-de_gwd_nginx="1.19.1"
+de_gwd_nginx="1.19.2"
 
 
 
@@ -276,14 +276,44 @@ net.ipv4.tcp_keepalive_probes = 5
 net.ipv4.tcp_rfc1337 = 1
 net.ipv4.tcp_low_latency = 1
 net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.neigh.default.gc_thresh1 = 1024
-net.ipv4.neigh.default.gc_thresh2 = 2048
-net.ipv4.neigh.default.gc_thresh3 = 4096
-net.core.default_qdisc = cake
-net.ipv4.tcp_congestion_control = bbr
 EOF
 
+sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
+sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf
+
+if [[ $(uname -r) =~ "bbrplus" ]]; then
+  echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
+  echo "net.ipv4.tcp_congestion_control = bbrplus" >> /etc/sysctl.conf
+else
+  echo "net.core.default_qdisc = cake" >> /etc/sysctl.conf
+  echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
+fi
 sysctl -p
+}
+
+
+de_GWDconnect(){
+$(curl -Is  http://www.google.com/ncr | head -n 1) >/dev/null 2>&1
+echo ""
+if [[ $(curl -Is  http://www.google.com/ncr | head -n 1) =~ "HTTP" ]]; then
+    echo "$statuSuccess de_GWD server connect"
+    echo "$statuSuccess de_GWD server connect"
+    echo "$statuSuccess de_GWD server connect"
+else
+    echo "$statusFailed de_GWD server connect"
+    echo "$statusFailed de_GWD server connect"
+    echo "$statusFailed de_GWD server connect"
+
+cat << EOF >/etc/resolv.conf
+nameserver 119.29.29.29
+nameserver 119.28.28.28
+nameserver 114.114.114.114
+nameserver 114.114.115.115
+EOF
+
+    exit
+fi
+echo ""
 }
 
 
@@ -518,6 +548,7 @@ Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
 CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
 ExecStart=/usr/local/bin/v2dns/v2dns -config /usr/local/bin/v2dns/config.json
 Restart=always
 StartLimitBurst=0
@@ -592,7 +623,8 @@ User=root
 Type=simple
 LimitNPROC=64000
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
 ExecStart=/usr/local/bin/vtrui/vtrui -config /usr/local/bin/vtrui/config.json
 Restart=always
 StartLimitBurst=0
@@ -698,8 +730,21 @@ fi
 ip rule add fwmark 0x9 table 100 pref 100
 ip route add local 0.0.0.0/0 dev lo table 100
 
-iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
-iptables -A INPUT -p tcp --tcp-flags RST RST -j DROP
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
+iptables -A INPUT -p tcp ! --syn -m conntrack --ctstate NEW -j DROP
+iptables -A INPUT -p tcp -tcp-flags FIN,SYN FIN,SYN -j DROP
+iptables -A INPUT -p tcp -tcp-flags SYN,RST SYN,RST -j DROP
+iptables -A INPUT -p tcp -tcp-flags FIN,RST FIN,RST -j DROP
+iptables -A INPUT -p tcp -tcp-flags FIN,ACK FIN -j DROP
+iptables -A INPUT -p tcp -tcp-flags ACK,URG URG -j DROP
+iptables -A INPUT -p tcp -tcp-flags ACK,FIN FIN -j DROP
+iptables -A INPUT -p tcp -tcp-flags ACK,PSH PSH -j DROP
+iptables -A INPUT -p tcp -tcp-flags ALL ALL -j DROP
+iptables -A INPUT -p tcp -tcp-flags ALL NONE -j DROP
+iptables -A INPUT -p tcp -tcp-flags ALL FIN,PSH,URG -j DROP
+iptables -A INPUT -p tcp -tcp-flags ALL SYN,FIN,PSH,URG -j DROP
+iptables -A INPUT -p tcp -tcp-flags ALL SYN,RST,ACK,FIN,URG -j DROP
 
 iptables -A INPUT -p tcp --dport 5310 -i $ethernetnum -j DROP
 iptables -A INPUT -p udp --dport 5310 -i $ethernetnum -j DROP
@@ -802,28 +847,6 @@ resolvconf -u
 
 systemctl start iptables-proxy
 echo "$statusInstalled iptables-proxy"
-
-$(curl -Is  http://www.google.com/ncr | head -n 1) >/dev/null 2>&1
-echo ""
-if [[ $(curl -Is  http://www.google.com/ncr | head -n 1) =~ "HTTP" ]]; then
-    echo "$statuSuccess de_GWD server connect"
-    echo "$statuSuccess de_GWD server connect"
-    echo "$statuSuccess de_GWD server connect"
-else
-    echo "$statusFailed de_GWD server connect"
-    echo "$statusFailed de_GWD server connect"
-    echo "$statusFailed de_GWD server connect"
-
-cat << EOF >/etc/resolv.conf
-nameserver 119.29.29.29
-nameserver 119.28.28.28
-nameserver 114.114.114.114
-nameserver 114.114.115.115
-EOF
-
-    exit
-fi
-echo ""
 }
 
 
@@ -1129,6 +1152,7 @@ touch /etc/nginx/conf.d/0_top
 
 cat << EOF >/etc/nginx/conf.d/1_serverHead
 server {
+  listen 443 quic reuseport;
   listen 443 ssl http2 fastopen=128 reuseport;
   root /var/www/html;
   index index.php index.html index.htm;
@@ -1145,23 +1169,25 @@ cat << EOF >/etc/nginx/conf.d/2_tlsParameter
   ssl_session_cache builtin:1000 shared:SSL:10m;
   ssl_buffer_size 4k;
 
-  add_header Referrer-Policy "no-referrer" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header X-Download-Options "noopen" always;
-  add_header X-Frame-Options "DENY" always;
-  add_header X-Permitted-Cross-Domain-Policies "none" always;
-  add_header X-Robots-Tag "none" always;
-  add_header X-XSS-Protection "1; mode=block" always;
-  add_header Strict-Transport-Security "max-age=63072000" always;
+  add_header alt-svc 'quic=":443"; h3-27=":443"; h3-25=":443"; h3-T050=":443"; h3-Q050=":443"; h3-Q049=":443"; h3-Q048=":443"; h3-Q046=":443"; h3-Q043=":443"; ma=86400';
+  add_header Referrer-Policy                    no-referrer;
+  add_header X-Content-Type-Options             nosniff;
+  add_header X-Download-Options                 noopen;
+  add_header X-Frame-Options                    DENY;
+  add_header X-Permitted-Cross-Domain-Policies  none;
+  add_header X-Robots-Tag                       none;
+  add_header X-XSS-Protection                   "1; mode=block";
+  add_header Strict-Transport-Security          "max-age=63072000" always;
 
-location ~ /\.(?!well-known).* {
-  deny all;
-}
 EOF
 
 touch /etc/nginx/conf.d/3_reverseProxy
 
 cat << EOF >/etc/nginx/conf.d/4_end
+location ~ /\.(?!well-known).* {
+  deny all;
+}
+
 location ~ [^/]\.php(/|$) {
   fastcgi_pass unix:/run/php/php-fpm.sock;
   fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
@@ -1283,20 +1309,16 @@ update-grub
 cat << EOF >~/bbrkernel/clearkernel
 #!/bin/bash
 PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-
 sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
 sed -i "/net.ipv4.tcp_congestion_control/d" /etc/sysctl.conf
-
 echo "net.core.default_qdisc = cake" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
 sysctl -p
-
 crontab -l > ~/now.cron
 sed -i '/clearkernel/d' ~/now.cron
 crontab ~/now.cron
 rm -rf ~/now.cron
 rm -rf ~/bbrkernel
-
 systemctl restart sshd
 EOF
 
@@ -1316,9 +1338,16 @@ fi
 
 
 postInstall(){
-if [[ $(dpkg --list | grep linux-image | awk '{print $2}') != "linux-image-5.7.7" ]] && [[ $(dpkg --list | grep linux-image | awk '{print $2}') != "linux-image-5.6.15" ]]; then
+if [[ -z $(dpkg --list | grep linux-image | awk '/bbrplus/') ]] && [[ $(dpkg --list | grep linux-image | awk '{print $2}') != "linux-image-5.7.7" ]] && [[ $(dpkg --list | grep linux-image | awk '{print $2}') != "linux-image-5.6.15" ]]; then
   installKernel
 fi
+
+if [[ $(jq -r '.address.udp' /usr/local/bin/0conf) = "on" ]]; then
+  /usr/local/bin/ui-onUDP >/dev/null 2>&1
+else
+  /usr/local/bin/ui-offUDP >/dev/null 2>&1
+fi
+systemctl restart iptables-proxy
 
 if [[ $(jq -r '.address.alias' /usr/local/bin/0conf) != "null" ]]; then
   /usr/local/bin/ui-markThis >/dev/null 2>&1
@@ -1333,32 +1362,28 @@ fi
 
 /usr/local/bin/ui-saveDNSChina >/dev/null 2>&1
 systemctl restart smartdns
+
 /usr/local/bin/ui_4h
 systemctl restart doh-client
 systemctl restart v2dns
+
 if [[ -n $(jq -r '.divertLan.ip[]' /usr/local/bin/0conf 2>/dev/null) ]]; then
   /usr/local/bin/ui-NodeDTshow >/dev/null 2>&1
 else
   /usr/local/bin/ui-NodeDThide >/dev/null 2>&1
 fi
 
+if [[ $(jq -r '.FORWARD.FWD1.status' /usr/local/bin/0conf 2>/dev/null) = "on" ]];then
+  /usr/local/bin/ui-FWD1save
+  /usr/local/bin/ui-FWD1vtrui
+  systemctl restart vtrui1
+fi
+
 if [[ $(jq -r '.FORWARD.FWD0.status' /usr/local/bin/0conf 2>/dev/null) = "on" ]];then
   /usr/local/bin/ui-FWD0save
   /usr/local/bin/ui-FWD0vtrui
 fi
-
-if [[ $(jq -r '.FORWARD.FWD1.status' /usr/local/bin/0conf 2>/dev/null) = "on" ]];then
-  /usr/local/bin/ui-FWD1save
-  /usr/local/bin/ui-FWD1vtrui
-fi
-
 systemctl restart vtrui
-if [[ $(jq -r '.address.udp' /usr/local/bin/0conf) = "on" ]]; then
-  /usr/local/bin/ui-onUDP >/dev/null 2>&1
-else
-  /usr/local/bin/ui-offUDP >/dev/null 2>&1
-fi
-systemctl restart iptables-proxy
 
 crontab -l > ~/now.cron
 sed -i '/\/usr\/local\/bin\/ui_am4/d' ~/now.cron
@@ -1477,6 +1502,8 @@ sed -i '1i\create chnroute hash:net family inet hashsize 2048 maxelem 65535' /us
 
 installIptablesProxy
 
+de_GWDconnect
+
 installDep
 
 installPihole
@@ -1541,44 +1568,70 @@ blue "------------------------------"
 
 
 
-updateGWDfull(){
-preUpdate
+updatePihole(){
+de_GWDconnect
 
-preDownload
+jq '.dns.servers=[{"address":"127.0.0.1","port":5380}]' /usr/local/bin/v2dns/config.json >/tmp/v2dns_temp && mv -f /tmp/v2dns_temp /usr/local/bin/v2dns/config.json
 
-preInstall
-
-preConf
-
-installSmartDNS
-
-installDOH
-
-installV2ray
-
-installIptablesProxy
+systemctl restart v2dns
+sleep 3
 
 installDep
+
+piholePW=$(jq -r '.address.pihole' /usr/local/bin/0conf)
+
+ethernetnum=$(ip --oneline link show up | grep -v "lo" | awk '{print$2;exit}' | cut -d':' -f1 | cut -d'@' -f1)
+localaddr=$(ip a | grep "$ethernetnum" | awk '{print $2}' | awk 'END {print}' | cut -d'/' -f1)
+
+rm -rf /etc/.pihole /etc/pihole /opt/pihole /usr/bin/pihole-FTL /usr/local/bin/pihole /var/www/html/pihole /var/www/html/admin
 
 installPihole
 
 piholeSet
 
-installNginxDo
+if [[ $(jq -r '.address.udp' /usr/local/bin/0conf) = "on" ]]; then
+  /usr/local/bin/ui-onUDP >/dev/null 2>&1
+else
+  /usr/local/bin/ui-offUDP >/dev/null 2>&1
+fi
+systemctl restart iptables-proxy
 
-nginxSet
+if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
+  /usr/local/bin/ui-onDHCP
+fi
 
-installWebUI
+/usr/local/bin/ui_4h
+systemctl restart v2dns
 
-postInstall
-blue "--------------------"
-blue "Update de_GWD [done]"
-blue "--------------------"
+if [[ -n $(jq -r '.divertLan.ip[]' /usr/local/bin/0conf 2>/dev/null) ]]; then
+  /usr/local/bin/ui-NodeDTshow >/dev/null 2>&1
+else
+  /usr/local/bin/ui-NodeDThide >/dev/null 2>&1
+fi
+
+if [[ $(jq -r '.FORWARD.FWD1.status' /usr/local/bin/0conf 2>/dev/null) = "on" ]];then
+  /usr/local/bin/ui-FWD1save
+  /usr/local/bin/ui-FWD1vtrui
+  systemctl restart vtrui1
+fi
+
+if [[ $(jq -r '.FORWARD.FWD0.status' /usr/local/bin/0conf 2>/dev/null) = "on" ]];then
+  /usr/local/bin/ui-FWD0save
+  /usr/local/bin/ui-FWD0vtrui
+fi
+systemctl restart vtrui
+blue "----------------------"
+blue "Install Pi-hole [done]"
+blue "----------------------"
 }
 
 
 
-updateGWDfast(){
+updateGWD(){
+if [[ $(systemctl is-active v2dns) = "active" ]]; then
+  de_GWDconnect
+fi
+
 preUpdate
 
 preDownload
@@ -1656,9 +1709,9 @@ else
     echo "[$statusBAD] php7.4-FPM     [start failed]"
 fi
 
-if [[ -n $(docker container ls | awk '/nginx/') ]]; then
+if [[ -n $(docker container ls 2>/dev/null | awk '/nginx/') ]]; then
     echo "[$statusGOOD] Docker nginx   [working]"
-elif [[ -z $(docker image ls | awk '/nginx/') ]]; then
+elif [[ -z $(docker image ls 2>/dev/null | awk '/nginx/') ]]; then
     echo "[$statusBAD] Docker nginx   [not installed]"
 else
     echo "[$statusBAD] Docker nginx   [start failed]"
@@ -1677,8 +1730,9 @@ blue "-----------------------------------------------"
     echo ""
     green  "1. Install de_GWD"
     green  "2. Change de_GWD password"
-    yellow "9. Update de_GWD (full)"
-    yellow "0. Update de_GWD (fast)"
+    yellow "8. update Nginx(docker)"
+    yellow "9. Update Pi-hole"
+    yellow "0. Update de_GWD"
     red    "CTRL+C EXIT"
     echo ""
     read -p "Select:" num
@@ -1691,12 +1745,16 @@ blue "-----------------------------------------------"
     change_piholeAdmin
     start_menu
     ;;
+    8)
+    installNginxDo
+    start_menu
+    ;;
     9)
-    updateGWDfull
+    updatePihole
     start_menu
     ;;
     0)
-    updateGWDfast
+    updateGWD
     start_menu
     ;;
     *)
