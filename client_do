@@ -544,7 +544,7 @@ systemctl start v2dns
 
 cat << EOF >/usr/local/bin/vtrui/config.json
 {
-"dns":{"servers":[{"address":"127.0.0.1","port":53}]},
+"dns":{"servers":[{"address":"127.0.0.1","port":5380}]},
 "inbounds":[
   {
     "port":9896,
@@ -1004,9 +1004,11 @@ pihole restartdns
 
 installNginxDo(){
 mkdir -p "/etc/nginx"
-mkdir -p "/etc/nginx/conf.d"
-mkdir -p "/var/log/nginx"
+mkdir -p "/etc/nginx/conf.d/"
+mkdir -p "/var/www/html"
 mkdir -p "/var/www/ssl"
+mkdir -p "/run/php/"
+mkdir -p "/var/log/nginx"
 
 if [[ $(ls -A "/var/www/ssl" | wc -w) == "0" ]]; then
 cd /var/www/ssl
@@ -1344,9 +1346,9 @@ systemctl restart smartdns
 systemctl restart doh-client
 systemctl restart v2dns
 
-if [[ -n $(jq -r '.divertLan.ip[]' /usr/local/bin/0conf 2>/dev/null) ]]; then
+if [[ $(jq -r '.divertLan.display' /usr/local/bin/0conf 2>/dev/null) = "block" ]]; then
   /usr/local/bin/ui-NodeDTshow >/dev/null 2>&1
-else
+elif [[ $(jq -r '.divertLan.display' /usr/local/bin/0conf 2>/dev/null) = "none" ]]; then
   /usr/local/bin/ui-NodeDThide >/dev/null 2>&1
 fi
 
@@ -1455,11 +1457,11 @@ deb http://$aptLocal/debian-security $(cat /etc/os-release | grep VERSION= | cut
 deb http://$aptLocal/debian $(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)-updates main contrib non-free
 EOF
 
-preDownload
-
 preInstall
 
 preConf
+
+preDownload
 
 installSmartDNS
 
@@ -1580,9 +1582,9 @@ fi
 /usr/local/bin/ui_4h
 systemctl restart v2dns
 
-if [[ -n $(jq -r '.divertLan.ip[]' /usr/local/bin/0conf 2>/dev/null) ]]; then
+if [[ $(jq -r '.divertLan.display' /usr/local/bin/0conf 2>/dev/null) = "block" ]]; then
   /usr/local/bin/ui-NodeDTshow >/dev/null 2>&1
-else
+elif [[ $(jq -r '.divertLan.display' /usr/local/bin/0conf 2>/dev/null) = "none" ]]; then
   /usr/local/bin/ui-NodeDThide >/dev/null 2>&1
 fi
 
@@ -1611,9 +1613,9 @@ fi
 
 preUpdate
 
-preDownload
-
 preConf
+
+preDownload
 
 installSmartDNS
 
