@@ -18,7 +18,7 @@ fi
 
 cat > /usr/local/bin/vtrui/config.json << EOF
 {
-  "dns":{"servers":[{"address":"127.0.0.1","port":5390}]},
+  "dns":{"servers":["localhost"]},
   "inbounds":[
     {
     "port":9896,
@@ -32,8 +32,11 @@ cat > /usr/local/bin/vtrui/config.json << EOF
   "outbounds": [
     {
       "tag": "proxy",
-      "mux": { "enabled": true },
-      "protocol": "vless",
+      "mux": {
+        "enabled": true,
+        "concurrency": 16
+      },
+      "protocol": "vmess",
       "settings": {
         "vnext": [
           {
@@ -42,7 +45,7 @@ cat > /usr/local/bin/vtrui/config.json << EOF
             "users": [
               {
                 "id": "00000000-0000-0000-0000-000000000000",
-                "encryption": "none",
+                "security": "auto",
                 "level": 1
               }
             ]
@@ -66,7 +69,11 @@ cat > /usr/local/bin/vtrui/config.json << EOF
     },
     {
       "tag": "netflix",
-      "protocol": "vless",
+      "mux": {
+        "enabled": true,
+        "concurrency": 16
+      },
+      "protocol": "vmess",
       "settings": {
         "vnext": [
           {
@@ -75,7 +82,7 @@ cat > /usr/local/bin/vtrui/config.json << EOF
             "users": [
               {
                 "id": "00000000-0000-0000-0000-000000000000",
-                "encryption": "none",
+                "security": "auto",
                 "level": 1
               }
             ]
