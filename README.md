@@ -4,14 +4,14 @@
 
 ![de_GWD](https://i.loli.net/2020/09/23/GFnkHDvSrsap5fM.png)
 
-## Server：
+## Server:
 ```
 apt install -y wget
 bash <(wget --no-check-certificate -qO- https://raw.githubusercontent.com/jacyl4/de_GWD/main/server)
 ```
 
 
-## Client：
+## Client:
 General Edition (amd64)
 ```
 apt install -y wget
