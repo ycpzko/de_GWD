@@ -128,6 +128,80 @@ fi
 
 
 
+installKernel(){
+apt install -y wget
+mkdir -p ~/bbrkernel && cd ~/bbrkernel
+wget --no-check-certificate -c --tries=10 https://raw.githubusercontent.com/jacyl4/de_GWD/main/resource/linux-headers-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
+wget --no-check-certificate -c --tries=10 https://raw.githubusercontent.com/jacyl4/de_GWD/main/resource/linux-image-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
+
+if [[ $(ls -l ~/bbrkernel/linux-headers-*.deb | awk '{print$5}') -gt 7665000 ]] && [[ $(ls -l ~/bbrkernel/linux-image-*.deb | awk '{print$5}') -gt 45981000 ]]; then
+dpkg -i linux-headers-*.deb
+dpkg -i linux-image-*.deb
+
+dpkg --list | grep linux-image | awk '{print $2}' | sed '/5.7.7/d' | sed '/5.6.15/d' | while read line
+do
+apt purge -y $line
+done
+
+update-grub
+
+cat << EOF >~/bbrkernel/clearkernel
+#!/bin/bash
+PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
+sed -i "/net.ipv4.tcp_congestion_control/d" /etc/sysctl.conf
+echo "net.core.default_qdisc = cake" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
+sysctl -p
+crontab -l > ~/now.cron
+sed -i '/clearkernel/d' ~/now.cron
+crontab ~/now.cron
+rm -rf ~/now.cron
+rm -rf ~/bbrkernel
+systemctl restart sshd
+EOF
+
+chmod +x ~/bbrkernel/clearkernel
+
+crontab -l > ~/now.cron
+echo '@reboot ~/bbrkernel/clearkernel' >> ~/now.cron
+crontab ~/now.cron
+rm -rf ~/now.cron
+
+echo "Kernel updated, please reboot." >~/bbrkernel/reboot
+else
+    red "Kernel download failed"
+fi
+}
+
+
+
+de_GWDconnect(){
+$(curl -Is  http://www.google.com/ncr | head -n 1) >/dev/null 2>&1
+echo ""
+if [[ $(curl -Is  http://www.google.com/ncr | head -n 1) =~ "HTTP" ]]; then
+    echo "$statuSuccess de_GWD server connect"
+    echo "$statuSuccess de_GWD server connect"
+    echo "$statuSuccess de_GWD server connect"
+else
+    echo "$statusFailed de_GWD server connect"
+    echo "$statusFailed de_GWD server connect"
+    echo "$statusFailed de_GWD server connect"
+
+cat << EOF >/etc/resolv.conf
+nameserver 119.29.29.29
+nameserver 119.28.28.28
+nameserver 114.114.114.114
+nameserver 114.114.115.115
+EOF
+
+    exit
+fi
+echo ""
+}
+
+
+
 preInstall(){
 cat << EOF >/etc/apt/apt.conf.d/01InstallLess
 APT::Get::Assume-Yes "true";
@@ -289,33 +363,7 @@ wget --no-check-certificate -c -O ~/smartdns.deb $mirrorSite/amd64_smartdns.deb
 wget --no-check-certificate -c -O ~/doh.zip $mirrorSite/amd64_doh.zip
 wget --no-check-certificate -c -O ~/vtrui.zip $mirrorSite/amd64_vtrui.zip
 wget --no-check-certificate -c -O ~/ttyd $mirrorSite/amd64_ttyd
-wget --no-check-certificate -c https://bgp.space/china.html
-}
-
-
-
-de_GWDconnect(){
-$(curl -Is  http://www.google.com/ncr | head -n 1) >/dev/null 2>&1
-echo ""
-if [[ $(curl -Is  http://www.google.com/ncr | head -n 1) =~ "HTTP" ]]; then
-    echo "$statuSuccess de_GWD server connect"
-    echo "$statuSuccess de_GWD server connect"
-    echo "$statuSuccess de_GWD server connect"
-else
-    echo "$statusFailed de_GWD server connect"
-    echo "$statusFailed de_GWD server connect"
-    echo "$statusFailed de_GWD server connect"
-
-cat << EOF >/etc/resolv.conf
-nameserver 119.29.29.29
-nameserver 119.28.28.28
-nameserver 114.114.114.114
-nameserver 114.114.115.115
-EOF
-
-    exit
-fi
-echo ""
+wget --no-check-certificate -c -O ~/china https://bgp.space/china.html
 }
 
 
@@ -478,6 +526,7 @@ cp -f ~/vtrui/v2ray /usr/local/bin/v2dns/v2dns
 cp -f ~/vtrui/v2ctl /usr/local/bin/v2dns/v2ctl
 cp -f ~/vtrui/v2ray /usr/local/bin/vtrui/vtrui
 cp -f ~/vtrui/v2ctl /usr/local/bin/vtrui/v2ctl
+cp -f ~/vtrui/geoip.dat /usr/local/bin/vtrui/geoip.dat
 chmod +x /usr/local/bin/v2dns/v2dns
 chmod +x /usr/local/bin/v2dns/v2ctl
 chmod +x /usr/local/bin/vtrui/vtrui
@@ -584,8 +633,22 @@ cat << EOF >/usr/local/bin/vtrui/config.json
       },
       "sockopt":{"mark":255}
     }
+  },
+  {
+    "tag":"Direct",
+    "protocol":"freedom",
+    "settings":{},
+    "streamSettings":{
+      "sockopt":{"mark":255}
+      }
   }
-]
+],
+"routing":{
+  "domainStrategy":"AsIs",
+  "rules":[
+    {"outboundTag":"Direct","type":"field","ip":["geoip:cn","geoip:private"]}
+  ]
+}
 }
 EOF
 
@@ -639,10 +702,10 @@ echo $doh1IP > /usr/local/bin/IPdoh
 echo $doh2IP >> /usr/local/bin/IPdoh
 echo $domainIP > /usr/local/bin/IPv2node
 
-sed -i '1,/BEGIN/d' ~/china.html
-sed -i '/END/,$d' ~/china.html
-sed -i 's/<br>//g' ~/china.html
-mv -f ~/china.html /usr/local/bin/chnrouteSET
+mv -f ~/china /usr/local/bin/chnrouteSET
+sed -i '1,/BEGIN/d' /usr/local/bin/chnrouteSET
+sed -i '/END/,$d' /usr/local/bin/chnrouteSET
+sed -i 's/<br>//g' /usr/local/bin/chnrouteSET
 sed -i 's/^/add chnroute &/g' /usr/local/bin/chnrouteSET
 sed -i '1i\create chnroute hash:net family inet hashsize 2048 maxelem 65535' /usr/local/bin/chnrouteSET
 
@@ -831,7 +894,7 @@ echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/base
 ln -fs /etc/resolvconf/run/resolv.conf /etc/resolv.conf
 resolvconf -u
 
-systemctl start iptables-proxy
+systemctl restart iptables-proxy
 echo "$statusInstalled iptables-proxy"
 }
 
@@ -941,6 +1004,8 @@ EOF
 systemctl daemon-reload >/dev/null 2>&1
 systemctl enable php7.4-fpm
 systemctl restart php7.4-fpm
+
+echo "$statusInstalled dependencies"
 }
 
 
@@ -1232,8 +1297,7 @@ unzip ~/ui-script.zip -d /usr/local/bin
 unzip ~/ui-web.zip -d /var/www/html
 fi
 
-wget --no-check-certificate -c https://raw.githubusercontent.com/jacyl4/de_GWD/$branch/version.php
-mv -f ~/version.php /var/www/html/act/version.php
+wget --no-check-certificate -c -O /var/www/html/act/version.php https://raw.githubusercontent.com/jacyl4/de_GWD/$branch/version.php
 
 mkdir -p /var/www/html/restore
 chown -R www-data:www-data /var/www/html
@@ -1273,60 +1337,13 @@ rm -rf ~/ui-web
 if [[ $(ls -l /var/www/html/spt 2>/dev/null | awk '{print$5}') != "104857600" ]]; then
   dd if=/dev/zero of=/var/www/html/spt bs=1k count=100k status=progress
 fi
-}
 
-
-
-installKernel(){
-apt install -y wget
-mkdir -p ~/bbrkernel && cd ~/bbrkernel
-wget --no-check-certificate -c --tries=10 https://raw.githubusercontent.com/jacyl4/de_GWD/main/resource/linux-headers-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
-wget --no-check-certificate -c --tries=10 https://raw.githubusercontent.com/jacyl4/de_GWD/main/resource/linux-image-$(cat /etc/os-release | grep VERSION= | cut -d'(' -f2 | cut -d')' -f1)_amd64.deb
-
-if [[ $(ls -l ~/bbrkernel/linux-headers-*.deb | awk '{print$5}') -gt 7665000 ]] && [[ $(ls -l ~/bbrkernel/linux-image-*.deb | awk '{print$5}') -gt 45981000 ]]; then
-dpkg -i linux-headers-*.deb
-dpkg -i linux-image-*.deb
-
-dpkg --list | grep linux-image | awk '{print $2}' | sed '/5.7.7/d' | sed '/5.6.15/d' | while read line
-do
-apt purge -y $line
-done
-
-update-grub
-
-cat << EOF >~/bbrkernel/clearkernel
-#!/bin/bash
-PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-sed -i "/net.core.default_qdisc/d" /etc/sysctl.conf
-sed -i "/net.ipv4.tcp_congestion_control/d" /etc/sysctl.conf
-echo "net.core.default_qdisc = cake" >> /etc/sysctl.conf
-echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
-sysctl -p
-crontab -l > ~/now.cron
-sed -i '/clearkernel/d' ~/now.cron
-crontab ~/now.cron
-rm -rf ~/now.cron
-rm -rf ~/bbrkernel
-systemctl restart sshd
-EOF
-
-chmod +x ~/bbrkernel/clearkernel
-
-crontab -l > ~/now.cron
-echo '@reboot ~/bbrkernel/clearkernel' >> ~/now.cron
-crontab ~/now.cron
-rm -rf ~/now.cron
-
-echo "Kernel updated, please reboot." >~/bbrkernel/reboot
-else
-    red "Kernel download failed"
-fi
+echo "$statusInstalled WebUI"
 }
 
 
 
 postInstall(){
-/usr/local/bin/ui_am4
 /usr/local/bin/ui_2h
 
 if [[ -z $(dpkg --list | grep linux-image | awk '/bbrplus/') ]] && [[ $(dpkg --list | grep linux-image | awk '{print $2}') != "linux-image-5.7.7" ]] && [[ $(dpkg --list | grep linux-image | awk '{print $2}') != "linux-image-5.6.15" ]]; then
@@ -1336,6 +1353,8 @@ fi
 if [[ $(jq -r '.address.dhcp' /usr/local/bin/0conf) = "on" ]]; then
   /usr/local/bin/ui-onDHCP
 fi
+
+/usr/local/bin/ui_am4
 
 if [[ $(jq -r '.address.udp' /usr/local/bin/0conf) = "on" ]]; then
   /usr/local/bin/ui-onUDP >/dev/null 2>&1
@@ -1400,34 +1419,34 @@ red "$(cat ~/bbrkernel/reboot 2>/dev/null)"
 
 
 installGWD(){
-    green "========================="
+    green "==========================="
     green " de_GWD local IP address"
-    green "========================="
+    green "==========================="
     read localaddr
 
-    green "========================="
+    green "==========================="
     green " Upstream route IP address"
-    green "========================="
+    green "==========================="
     read gatewayaddr
 
-    green "========================="
+    green "==========================="
     green " DoH"
-    green "========================="
+    green "==========================="
     read doh1
 
-    green "========================="
+    green "==========================="
     green " Domain"
-    green "========================="
+    green "==========================="
     read v2servn
 
-    green "========================="
+    green "==========================="
     green " Path"
-    green "========================="
+    green "==========================="
     read v2path
     
-    green "========================="
+    green "==========================="
     green " UUID"
-    green "========================="
+    green "==========================="
     read uuidnum
 
 cd ~
@@ -1623,6 +1642,8 @@ installDOH
 installV2ray
 
 installIptablesProxy
+
+de_GWDconnect
 
 piholeSet
 
