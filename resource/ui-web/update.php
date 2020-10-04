@@ -158,11 +158,23 @@
 
 <div class="row mt-4">
     <div class="col"><hr></div>
-    <div class="col-auto"><a href="https://jacyl4.github.io/de_GWD/" target="_blank">捐赠</a></div>
+    <div class="col-auto"><a href="#" data-toggle="modal" data-target="#donate">捐赠</a></div>
     <div class="col"><hr></div>
 </div>
 
-
+<!-- Modal -->
+<div class="modal fade" id="donate" tabindex="-1" role="dialog" aria-labelledby="donate" aria-hidden="true">
+  <div class="modal-dialog modal-sm" style="top:50%" role="document">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">捐赠</h5>
+      </div>
+      <div class="modal-body">
+        <img src="https://i.loli.net/2020/04/22/EaMjS1J8yfrVv4N.png" width="260">
+      </div>
+    </div>
+  </div>
+</div>
         <!-- Page Content -->
       </div>
       <!-- /.container-fluid -->
